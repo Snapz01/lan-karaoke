@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LAN Karaoke – TV</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/Outfit-Bold.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-theme="neon" data-size="normal" class="is-idle">
+  <div id="stage">
+    <div id="frame">
+      <div id="bg">
+        <canvas id="bgArt" width="32" height="18"></canvas>
+        <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+        <div id="vignette"></div>
+      </div>
+      <div id="fx"><div class="disco"><i></i></div></div>
+
+      <video id="video" playsinline preload="auto"></video>
+      <audio id="audio" preload="auto"></audio>
+
+      <canvas id="viz" width="960" height="160"></canvas>
+
+      <div id="lyrics" class="off">
+        <div id="lyricsStack">
+          <div class="line prev" id="lPrev"></div>
+          <div class="line cur" id="lCur"></div>
+          <div id="instrumental" class="hidden">♪ ♪ ♪</div>
+          <div id="countdown" class="hidden">
+            <div class="num" id="cdNum">3</div>
+            <div class="dots"><b></b><b></b><b></b></div>
+            <div class="bar"><i id="cdBar"></i></div>
+          </div>
+          <div class="line next" id="lNext"></div>
+          <div class="line next2" id="lNext2"></div>
+        </div>
+      </div>
+
+      <div id="nowCard" class="card hidden">
+        <div class="cover"><img id="nowCover" alt=""><div class="cover-ph" id="nowPh"></div></div>
+        <div class="info">
+          <div class="t" id="nowTitle"></div>
+          <div class="a" id="nowArtist"></div>
+          <div class="s" id="nowSinger"></div>
+        </div>
+        <div class="time" id="nowTime"></div>
+      </div>
+
+      <div id="nextChip" class="card hidden">
+        <span class="lbl">Nästa</span><span class="who" id="nextWho"></span><span class="what" id="nextWhat"></span>
+      </div>
+
+      <div id="qrCard" class="card">
+        <img id="qrSmall" alt="QR-kod">
+        <b>Välj låt!</b>
+        <span id="qrUrlSmall"></span>
+      </div>
+
+      <div id="idle">
+        <div class="left">
+          <h1><small>LAN KARAOKE</small><span class="neon-title">Dags att sjunga!</span></h1>
+          <p>Skanna QR-koden med mobilen, välj en låt och skriv ditt namn.</p>
+          <div class="stats" id="idleStats"></div>
+          <ul class="queue" id="idleQueue"></ul>
+          <div class="history" id="idleHistory"></div>
+          <div class="tip" id="idleTip"></div>
+        </div>
+        <div class="right">
+          <div class="qrrow">
+            <div class="qrbig card hidden" id="wifiCard">
+              <div class="step">1 · Anslut till Wi-Fi</div>
+              <img id="qrWifi" alt="Wi-Fi-QR">
+              <div id="wifiText"></div>
+            </div>
+            <div class="qrbig card">
+              <div class="step" id="appStep">Välj låt</div>
+              <img id="qrBig" alt="QR-kod">
+              <div id="qrUrlBig"></div>
+            </div>
+          </div>
+          <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+
+      <div id="reactions"></div>
+
+      <div id="intro" class="hidden">
+        <div class="box card">
+          <div class="cover big"><img id="introCover" alt=""><div class="cover-ph" id="introPh"></div></div>
+          <div>
+            <div class="lbl">NÄSTA SÅNGARE</div>
+            <div class="singer" id="introSinger"></div>
+            <div class="song" id="introSong"></div>
+            <div class="artist" id="introArtist"></div>
+            <div class="count">Startar om <b id="introCount">5</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="celebrate" class="hidden"></div>
+      <div id="progress"><i id="progressBar"></i></div>
+      <div id="toast" class="card hidden"></div>
+      <div id="status"></div>
+      <div id="unlock" class="hidden">🔊 Klicka här för att aktivera ljudet</div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/tv.js"></script>
+</body>
+</html>

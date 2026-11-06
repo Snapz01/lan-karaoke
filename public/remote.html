@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#140a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>🎤 Karaoke – Fjärrkontroll</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Karaoke">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="/remote.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">🎤 <b>LAN</b> Karaoke <span class="host-only host-tag">Värdpanel</span></div>
+    <div class="conn" id="conn"><i></i><span>Ansluter…</span></div>
+  </header>
+
+  <!-- Nu spelas: kompakt rad, fälls ut till fulla kontroller -->
+  <section class="now" id="nowBar">
+    <div class="now-row">
+      <div class="cov"><img id="nowCover" alt=""><div class="cover-ph" id="nowPh">🎤</div></div>
+      <div class="now-info" id="nowInfo">
+        <div class="now-title" id="nowTitle">Inget spelas</div>
+        <div class="now-sub" id="nowSub">Välj en låt nedan 🎶</div>
+      </div>
+      <button class="ctl mini-toggle" data-cmd="toggle" id="btnToggleMini" aria-label="Spela/Pausa">▶</button>
+      <button class="icon expand" id="btnExpand" aria-label="Visa kontroller">▾</button>
+    </div>
+    <div class="now-progress"><i id="nowProgress"></i></div>
+    <div class="now-more" id="nowMore">
+      <div class="controls">
+        <button class="ctl" data-cmd="restart" title="Starta om låten" aria-label="Starta om">⏮</button>
+        <button class="ctl big" data-cmd="toggle" id="btnToggle" aria-label="Spela/Pausa">▶</button>
+        <button class="ctl" data-cmd="skip" id="btnSkip" aria-label="Hoppa över">⏭<small>Hoppa över</small></button>
+      </div>
+      <div class="volume">
+        <button id="btnMute" class="icon" aria-label="Ljud av/på">🔊</button>
+        <input type="range" id="volume" min="0" max="100" step="1" aria-label="Volym">
+        <span id="volLabel">85%</span>
+      </div>
+    </div>
+    <button class="lyricsbtn hidden" id="btnLyrics">📜 Visa texten här i mobilen</button>
+    <button class="vote hidden" id="btnVote">🗳️ Rösta för att hoppa över <span id="voteCount"></span></button>
+  </section>
+
+  <div id="myTurn" class="myturn hidden"></div>
+
+  <main>
+    <!-- 🔍 Sök -->
+    <section class="view active" id="view-search">
+      <form class="searchbox big" id="searchForm" autocomplete="off" role="search">
+        <span class="sicon">🔍</span>
+        <input id="q" type="search" placeholder="Vad vill du sjunga?" enterkeyhint="search" autocapitalize="off" spellcheck="false" aria-label="Sök artist eller låt">
+        <button type="button" class="clear hidden" id="qClear" aria-label="Rensa">✕</button>
+      </form>
+      <div id="searchHome">
+        <button class="dice" id="btnRandom"><span class="die">🎲</span><span><b>Överraska mig!</b><small>Slumpa fram en låt att sjunga</small></span></button>
+        <div class="section-title" id="recentTitle">Senaste sökningar</div>
+        <div class="chips" id="recentChips"></div>
+        <div class="section-title">Snabbval</div>
+        <div class="cats" id="searchPills">
+          <button data-cat="sv"><b>🇸🇪</b>Svenska klassiker</button>
+          <button data-cat="en"><b>🇬🇧</b>Engelska hits</button>
+          <button data-cat="dansband"><b>🕺</b>Dansband &amp; schlager</button>
+          <button data-cat="rockpop"><b>🎸</b>Rock &amp; pop</button>
+        </div>
+        <div class="chips hidden" id="suggestions"></div>
+        <div class="explain">
+          <div><b>🎤 Sjung med artist</b><span>Originallåten – texten fylls i takt på TV:n. Sänk artistens röst under Inställningar.</span></div>
+          <div><b>📺 Karaoke-text</b><span>Karaokeversion utan sång, texten är inbränd i videon.</span></div>
+          <div><b>⚡ Spela direkt</b><span>Låtar som redan finns på datorn – startar utan väntan.</span></div>
+        </div>
+      </div>
+      <div class="list" id="searchResults"></div>
+    </section>
+
+    <!-- 📁 Ladda upp -->
+    <section class="view" id="view-upload">
+      <form id="uploadForm" class="card form">
+        <h2>📁 Ladda upp låt</h2>
+        <label class="drop">
+          <input type="file" name="media" id="upMedia" accept=".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.mp4,.webm,.m4v,audio/*,video/*" required>
+          <span id="upMediaLabel">🎵 Välj ljud- eller videofil</span>
+          <small>MP3, WAV, FLAC, M4A, OGG, MP4, WEBM</small>
+        </label>
+        <label class="drop small">
+          <input type="file" name="lrc" id="upLrc" accept=".lrc,.txt">
+          <span id="upLrcLabel">📝 Valfri .lrc-fil med synkad text</span>
+        </label>
+        <div class="grid2">
+          <input name="artist" placeholder="Artist (valfritt)" autocomplete="off">
+          <input name="title" placeholder="Titel (valfritt)" autocomplete="off">
+        </div>
+        <small class="hint">Artist och titel läses annars från ID3-taggar eller filnamnet <i>"Artist - Titel.mp3"</i>. Texten hämtas automatiskt från LRCLIB.</small>
+        <input name="singer" class="singer-input" placeholder="🎤 Vem sjunger?" maxlength="40" autocomplete="off">
+        <label class="check"><input type="checkbox" id="upQueue" checked> Lägg direkt i kön</label>
+        <div class="bar hidden" id="upProgress"><i></i><span></span></div>
+        <button type="submit" class="primary wide" id="upBtn">⬆️ Ladda upp</button>
+      </form>
+    </section>
+
+    <!-- 📚 Bibliotek -->
+    <section class="view" id="view-library">
+      <div class="seg" id="libMode">
+        <button data-mode="all" class="on">📚 Alla</button>
+        <button data-mode="tonight">🔥 Ikväll</button>
+        <button data-mode="alltime">🏆 Topplista</button>
+        <button data-mode="recent">🕘 Historik</button>
+      </div>
+      <div id="libStats" class="hidden"></div>
+      <div id="libAll">
+      <input id="libSearch" class="field" type="search" placeholder="Sök i biblioteket…" autocomplete="off">
+      <div class="pills" id="libPills">
+        <button data-tag="" class="on">Alla</button>
+        <button data-tag="sv">🇸🇪 Svenska</button>
+        <button data-tag="en">🇬🇧 Engelska</button>
+        <button data-tag="dansband">🕺 Dansband &amp; Schlager</button>
+        <button data-tag="rockpop">🎸 Rock &amp; Pop</button>
+        <button data-tag="video">🎬 Video</button>
+      </div>
+      <div class="list" id="libList"></div>
+      </div>
+    </section>
+
+    <!-- 🎤 Kö -->
+    <section class="view" id="view-queue">
+      <div id="queueActions" class="row-actions"></div>
+      <div class="list" id="queueList"></div>
+    </section>
+
+    <!-- 🎛️ Inställningar -->
+    <section class="view" id="view-settings">
+      <div class="card">
+        <h2>🎛️ Enkla inställningar</h2>
+
+        <div class="setting">
+          <label>Textstorlek på TV:n</label>
+          <div class="seg" data-setting="textSize">
+            <button data-v="normal">Normal</button>
+            <button data-v="large">Stor</button>
+            <button data-v="xlarge">Extra stor</button>
+          </div>
+        </div>
+
+        <div class="setting">
+          <label>Snabb text-synk <span class="value" id="offsetLabel">±0,00 s</span></label>
+          <div class="grid2">
+            <button class="soft" id="btnEarly">⏪ Text kommer för tidigt −</button>
+            <button class="soft" id="btnLate">Text kommer för sent + ⏩</button>
+          </div>
+          <small class="hint">Justerar i steg om 0,25 s för låten som spelas.</small>
+          <button class="suggest-btn hidden" id="btnSuggestion"></button>
+        </div>
+
+        <div class="setting">
+          <label>Artistens röst (Sjung med artist)</label>
+          <div class="seg" data-setting="vocalReduce">
+            <button data-v="0">🔊 Full</button>
+            <button data-v="0.6">🔉 Svag</button>
+            <button data-v="1">🔇 Av</button>
+          </div>
+          <small class="hint">”Svag” ger stöd att följa, ”Av” blir riktig karaoke. Fungerar bäst på studioinspelningar – Karaoke-text-videor saknar redan sång.</small>
+        </div>
+
+        <div class="setting">
+          <label>Bakgrundstema på TV</label>
+          <div class="themes" data-setting="theme">
+            <button data-v="neon" class="th neon">🎆<span>Neon Party</span></button>
+            <button data-v="midnight" class="th midnight">🌙<span>Midnattsblå</span></button>
+            <button data-v="gold" class="th gold">✨<span>Guld/Schlager</span></button>
+            <button data-v="video" class="th video">🎬<span>Musikvideo i bakgrunden</span></button>
+          </div>
+        </div>
+      </div>
+
+      <details class="card adv" id="adv">
+        <summary>⚙️ Avancerat <span id="lockIcon"></span></summary>
+
+        <div class="group">
+          <h3>🎼 Tonart &amp; tempo</h3>
+          <div class="setting">
+            <label>Tonartsändring <span class="value" id="pitchLabel">0</span></label>
+            <input type="range" min="-6" max="6" step="1" data-setting="pitch">
+          </div>
+          <div class="setting">
+            <label>Uppspelningshastighet <span class="value" id="speedLabel">1,00×</span></label>
+            <input type="range" min="0.8" max="1.2" step="0.05" data-setting="speed">
+          </div>
+          <button class="soft" id="btnResetKey">↺ Återställ tonart &amp; tempo</button>
+        </div>
+
+        <div class="group">
+          <h3>⏱️ Exakt text-offset</h3>
+          <div class="setting">
+            <label>Offset (ms)</label>
+            <div class="offset-row">
+              <input type="range" min="-5000" max="5000" step="10" id="offsetRange">
+              <input type="number" min="-5000" max="5000" step="10" id="offsetNum" inputmode="numeric">
+            </div>
+          </div>
+          <button class="primary wide" id="btnSaveOffset">💾 Spara synk permanent för denna låt</button>
+        </div>
+
+        <div class="group">
+          <h3>🔊 Ljudutgång &amp; kanalval</h3>
+          <div class="setting">
+            <label>Kanaler</label>
+            <div class="seg" data-setting="mono">
+              <button data-v="false">Stereo</button>
+              <button data-v="true">Mono</button>
+            </div>
+          </div>
+          <div class="setting">
+            <label>Sångdämpning (vocal reducer) <span class="value" id="vocalLabel">0%</span></label>
+            <input type="range" min="0" max="1" step="0.05" data-setting="vocalReduce">
+            <small class="hint">Tar bort centrerad sång i vanliga MP3:or. Fungerar bäst på studioinspelningar.</small>
+          </div>
+          <label class="toggle"><span>Jämn ljudnivå mellan låtar (normalisering)</span><input type="checkbox" data-setting="normalize"><i></i></label>
+          <div class="setting"><label>Bas <span class="value" data-label="eqLow">0 dB</span></label><input type="range" min="-12" max="12" step="1" data-setting="eqLow"></div>
+          <div class="setting"><label>Mellanregister <span class="value" data-label="eqMid">0 dB</span></label><input type="range" min="-12" max="12" step="1" data-setting="eqMid"></div>
+          <div class="setting"><label>Diskant <span class="value" data-label="eqHigh">0 dB</span></label><input type="range" min="-12" max="12" step="1" data-setting="eqHigh"></div>
+        </div>
+
+        <div class="group">
+          <h3>🎉 Fest &amp; kö</h3>
+          <label class="toggle"><span>Rättvis kö (alla får en låt innan någon får två)</span><input type="checkbox" data-setting="fairQueue"><i></i></label>
+          <div class="setting">
+            <label>Max låtar per sångare i kön <span class="value" id="maxPerLabel">3</span></label>
+            <input type="range" min="0" max="10" step="1" data-setting="maxPerSinger">
+          </div>
+          <label class="toggle"><span>Värdläge (styrning kräver PIN, gäster röstar)</span><input type="checkbox" data-setting="hostMode"><i></i></label>
+          <small class="hint hidden" id="hostWarn">⚠️ Värdläge kräver att en PIN är satt i /etc/default/lan-karaoke – annars är alla värdar.</small>
+          <div class="setting">
+            <label>Röster som krävs för att hoppa över <span class="value" id="voteLabel">50%</span></label>
+            <input type="range" min="25" max="100" step="5" data-setting="voteSkipPercent">
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>📺 Kiosk &amp; TV-kalibrering</h3>
+          <label class="toggle"><span>Visa QR-kod på TV:n</span><input type="checkbox" data-setting="qrVisible"><i></i></label>
+          <label class="toggle"><span>Visa Wi-Fi-QR på TV:n (vänteläge)</span><input type="checkbox" data-setting="wifiQrVisible"><i></i></label>
+          <label class="toggle"><span>Emoji-reaktioner</span><input type="checkbox" data-setting="reactionsEnabled"><i></i></label>
+          <label class="toggle"><span>Spela nästa låt automatiskt</span><input type="checkbox" data-setting="autoPlay"><i></i></label>
+          <label class="toggle"><span>Föredra instrumental version vid ”Sjung med artist”</span><input type="checkbox" data-setting="preferInstrumental"><i></i></label>
+          <div class="setting">
+            <label>Overscan-marginal <span class="value" id="overscanLabel">0%</span></label>
+            <input type="range" min="0" max="5" step="0.5" data-setting="overscan">
+          </div>
+          <div class="setting">
+            <label>Intro-kort före låt <span class="value" id="introLabel">5 s</span></label>
+            <input type="range" min="0" max="15" step="1" data-setting="introSeconds">
+          </div>
+          <div class="setting">
+            <label>Max videoupplösning (YouTube)</label>
+            <div class="seg" data-setting="maxVideoHeight">
+              <button data-v="480">480p</button>
+              <button data-v="720">720p</button>
+              <button data-v="1080">1080p</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>✏️ Låt- &amp; textredigerare</h3>
+          <button class="soft wide" id="btnEditNow">✏️ Redigera låten som spelas</button>
+          <small class="hint">Övriga låtar: tryck ✏️ i Biblioteket.</small>
+        </div>
+
+        <div class="group">
+          <h3>🖥️ Systemkontroll</h3>
+          <div id="sysInfo" class="sys">Laddar…</div>
+          <div class="setting">
+            <label>Ljudutgång</label>
+            <div id="sinkList" class="sinks"><small class="hint">Laddar…</small></div>
+            <button class="soft wide" id="btnHdmi">📺 Aktivera HDMI-ljud till TV:n</button>
+          </div>
+          <div class="setting">
+            <label>YouTube-cookies <span class="value" id="cookieState">–</span></label>
+            <small class="hint">Behövs bara om YouTube kräver inloggning (”bekräfta att du inte är en robot”). Exportera cookies.txt (Netscape-format) från en webbläsare där du är inloggad.</small>
+            <div class="grid2">
+              <label class="soft filebtn">📄 Välj cookies.txt<input type="file" id="cookieFile" accept=".txt,text/plain"></label>
+              <button class="soft" id="btnCookieDel">🗑️ Ta bort</button>
+            </div>
+          </div>
+          <div class="grid2">
+            <button class="soft" id="btnSysRefresh">🔄 Uppdatera</button>
+            <button class="soft" id="btnClearCache">🧹 Rensa YouTube-cache</button>
+          </div>
+          <button class="danger wide" id="btnRestart">🔁 Starta om tjänsten</button>
+        </div>
+
+        <div class="group host-only" id="updateGroup">
+          <h3>🔄 Uppdatering från GitHub</h3>
+          <div id="updInfo" class="sys">Laddar…</div>
+          <div class="grid2">
+            <button class="soft" id="btnUpdCheck">🔍 Sök efter uppdatering</button>
+            <button class="primary" id="btnUpdApply" disabled>⬇️ Installera</button>
+          </div>
+          <button class="soft wide hidden" id="btnRollback">↩️ Återställ föregående version</button>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <div class="reactbar" id="reactBar">
+    <button data-e="🔥">🔥</button><button data-e="👏">👏</button><button data-e="❤️">❤️</button>
+    <button data-e="🎉">🎉</button><button data-e="🍺">🍺</button><button data-e="😂">😂</button>
+  </div>
+
+  <nav class="tabs">
+    <button data-view="search" class="on"><b>🔍</b>Sök låt</button>
+    <button data-view="upload"><b>📁</b>Ladda upp</button>
+    <button data-view="library"><b>📚</b>Bibliotek</button>
+    <button data-view="queue"><b>🎤</b>Kö<em id="queueBadge" class="hidden">0</em></button>
+    <button data-view="settings"><b>🎛️</b>Inställningar</button>
+  </nav>
+
+  <div id="lyricsView" class="lyricsview hidden" aria-hidden="true">
+    <div class="lv-top"><div class="lv-title" id="lvTitle"></div><button class="icon" id="lvClose" aria-label="Stäng">✕</button></div>
+    <div class="lv-body">
+      <div class="lv-line lv-prev" id="lvPrev"></div>
+      <div class="lv-line lv-cur" id="lvCur"></div>
+      <div class="lv-line lv-next" id="lvNext"></div>
+      <div class="lv-line lv-next2" id="lvNext2"></div>
+    </div>
+    <div class="lv-bottom"><span id="lvTime"></span><span class="lv-hint">Håll skärmen tänd 💡</span></div>
+  </div>
+
+  <div id="sheet" class="sheet hidden" aria-hidden="true">
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-panel" role="dialog">
+      <div class="grab" data-close></div>
+      <div id="sheetBody"></div>
+    </div>
+  </div>
+  <div id="toasts"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/remote.js"></script>
+</body>
+</html>

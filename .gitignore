@@ -1,0 +1,6 @@
+node_modules/
+media/
+data/
+*.tmp
+package-lock.json.bak
+.env

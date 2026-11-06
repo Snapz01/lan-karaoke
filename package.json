@@ -1,0 +1,24 @@
+{
+  "name": "lan-karaoke",
+  "version": "2.0.0",
+  "description": "Självhostad LAN-karaoke för Ubuntu Mini-PC (TV-vy + mobilfjärrkontroll)",
+  "type": "module",
+  "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test \"test/**/*.test.js\"",
+    "check": "node --check server.js && for f in lib/*.js public/*.js; do node --check \"$f\" || exit 1; done"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "music-metadata": "^11.9.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  }
+}
