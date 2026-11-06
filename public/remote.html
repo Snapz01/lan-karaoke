@@ -194,6 +194,22 @@
         </div>
 
         <div class="group">
+          <h3>🎯 Synk mellan låt och text</h3>
+          <label class="toggle"><span>Automatisk synk med röstanalys</span><input type="checkbox" data-setting="autoSync"><i></i></label>
+          <small class="hint">Analyserar sången i varje låt en gång och rättar intro-skillnad och tempoglidning. Ändrar bara när träffen är säker – annars visas ett förslag. <span id="syncStatus"></span></small>
+          <label class="toggle"><span>Kompensera automatiskt för webbläsarens ljudfördröjning</span><input type="checkbox" data-setting="autoLatency"><i></i></label>
+          <div class="setting">
+            <label>Ljudfördröjning TV/högtalare <span class="value" id="avLatLabel">0 ms</span></label>
+            <input type="range" min="-300" max="800" step="10" data-setting="avLatencyMs">
+            <small class="hint">Gäller alla låtar. Positivt värde = ljudet kommer efter bilden (vanligt när ljudet går via TV:n till en högtalare).</small>
+          </div>
+          <div class="grid2">
+            <button class="soft" id="btnCalibStart">🎯 Kalibrera på TV:n</button>
+            <button class="soft" id="btnCalibStop">✓ Klar</button>
+          </div>
+        </div>
+
+        <div class="group">
           <h3>⏱️ Exakt text-offset</h3>
           <div class="setting">
             <label>Offset (ms)</label>
@@ -242,6 +258,8 @@
 
         <div class="group">
           <h3>📺 Kiosk &amp; TV-kalibrering</h3>
+          <label class="toggle host-only"><span>Starta karaoke-TV automatiskt när datorn startar</span><input type="checkbox" id="autostartToggle"><i></i></label>
+          <small class="hint host-only">Av som standard. Starta annars manuellt med appen ”Karaoke TV” i programmenyn.</small>
           <label class="toggle"><span>Visa QR-kod på TV:n</span><input type="checkbox" data-setting="qrVisible"><i></i></label>
           <label class="toggle"><span>Visa Wi-Fi-QR på TV:n (vänteläge)</span><input type="checkbox" data-setting="wifiQrVisible"><i></i></label>
           <label class="toggle"><span>Emoji-reaktioner</span><input type="checkbox" data-setting="reactionsEnabled"><i></i></label>

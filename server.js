@@ -3,6 +3,7 @@
 import express from 'express';
 import http from 'node:http';
 import os from 'node:os';
+import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -805,6 +806,17 @@ app.post('/api/system/audio', requireAdmin, async (req, res) => {
     res.json({ ok: true, sink: req.body.sink });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+// Autostart av TV-vyn vid inloggning (flaggfil som kiosk-skriptet läser). Av som standard.
+const AUTOSTART_FLAG = path.join(os.homedir(), '.config', 'karaoke-kiosk.autostart');
+app.get('/api/system/autostart', requireAdmin, async (req, res) => res.json({ enabled: fs.existsSync(AUTOSTART_FLAG) }));
+app.post('/api/system/autostart', requireAdmin, async (req, res) => {
+  try {
+    if (req.body?.enabled) { await fsp.mkdir(path.dirname(AUTOSTART_FLAG), { recursive: true }); await fsp.writeFile(AUTOSTART_FLAG, `${new Date().toISOString()}\n`); }
+    else await fsp.rm(AUTOSTART_FLAG, { force: true });
+    res.json({ enabled: fs.existsSync(AUTOSTART_FLAG) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/system/cookies', requireAdmin, async (req, res) => {
   try { await saveCookies(String(req.body?.text || '')); res.json({ ok: true }); } catch (e) { res.status(400).json({ error: e.message }); }
 });

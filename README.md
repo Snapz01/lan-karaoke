@@ -84,9 +84,22 @@ sudo bash setup-ubuntu.sh
 Installern gör det här:
 - Installerar Node.js, ffmpeg, yt-dlp och Chromium
 - Frågar efter **PIN** (valfritt), **Wi-Fi** för QR-koden och **automatisk inloggning**
-- Startar servern automatiskt och TV-vyn i helskärm när datorn startar
+- Startar servern automatiskt när datorn startar, och lägger till apparna **Karaoke TV** och **Karaoke Värdpanel** i programmenyn
 
-Starta om datorn när installern är klar. TV:n visar sedan väntelägets QR-kod, och festen kan börja. 🎉
+Starta om datorn när installern är klar.
+
+### ▶️ Starta TV-vyn
+**Automatisk start är avstängd som standard.** Datorn kan alltså användas som vanligt tills du vill sjunga.
+
+| Vill du… | Gör så här |
+|---|---|
+| Starta karaoke nu | Öppna appen **Karaoke TV** i programmenyn |
+| Starta automatiskt varje gång datorn slås på | **Karaoke Värdpanel** → Kiosk & TV → slå på **Starta karaoke-TV automatiskt när datorn startar** |
+| Stänga TV-vyn | Tryck Alt+F4 eller kör `pkill -f karaoke-kiosk` |
+
+> Servern körs alltid i bakgrunden, så värdpanelen och mobilerna fungerar även när TV-vyn är stängd.
+
+TV:n visar väntelägets QR-kod, och festen kan börja. 🎉
 
 ---
 
@@ -94,7 +107,7 @@ Starta om datorn när installern är klar. TV:n visar sedan väntelägets QR-kod
 
 | Vem | Var | Adress |
 |---|---|---|
-| 📺 TV:n | Startar automatiskt | `http://localhost:3000/tv` |
+| 📺 TV:n | Appen **Karaoke TV** (eller automatiskt, se ovan) | `http://localhost:3000/tv` |
 | 📱 Gäster | Skanna QR-koden på TV:n | `http://<datorns-IP>:3000/remote` |
 | 🎛️ Värd | Appen **Karaoke Värdpanel** på datorn | `http://localhost:3000/host` |
 

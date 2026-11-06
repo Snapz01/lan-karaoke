@@ -221,3 +221,13 @@ body[data-theme="neon"] .neon-title, body[data-theme="neon"] #intro .lbl { anima
 #status { position: absolute; left: 1vw; bottom: 1vh; font-size: .8vw; color: rgba(255, 255, 255, .35); z-index: 3; }
 body.no-qr #qrCard { display: none; }
 body.video-full #nowCard { opacity: .0; }
+
+/* ── Kalibrering ── */
+#calib { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: rgba(5, 2, 15, .92); }
+.calib-box { text-align: center; }
+.calib-box .lbl { font-size: 1.4vw; letter-spacing: .3em; color: var(--accent2); font-weight: 700; }
+#calibDot { width: 18vw; height: 18vw; margin: 4vh auto; border-radius: 50%; background: rgba(255, 255, 255, .08); border: .3vw solid rgba(255, 255, 255, .2); }
+#calibDot.on { background: #fff; box-shadow: 0 0 6vw #fff, 0 0 12vw var(--accent); border-color: #fff; }
+.calib-help { font-size: 1.6vw; color: rgba(255, 255, 255, .8); }
+.calib-help b { color: var(--accent); }
+.calib-val { margin-top: 2vh; font-size: 2.4vw; font-weight: 700; color: var(--accent2); font-variant-numeric: tabular-nums; }

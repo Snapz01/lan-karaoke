@@ -109,6 +109,14 @@ const engine = {
     this.applyGain();
   },
 
+  // Fördröjning från mediaposition till högtalare: webbläsarens ljudbuffert + utgång (+ tonartsändringens korn ≈ 37 ms)
+  latency() {
+    const c = this.ctx;
+    if (!c) return 0;
+    const pitchDelay = this.pitch && (settings.pitch || 0) !== 0 ? (2 + 0.035 * c.sampleRate) / c.sampleRate : 0;
+    return (c.baseLatency || 0) + (c.outputLatency || 0) + pitchDelay;
+  },
+
   songGainDb: 0,
   applyGain() {
     if (!this.nodes.norm) return;
@@ -736,15 +744,28 @@ function spawnReaction(emoji, { fullWidth = false } = {}) {
 }
 
 // ───────────────────────────── Huvudloop ─────────────────────────────
+// Texttid = mediatid korrigerad för automatisk synk (tempo/förskjutning), manuell justering och ljudfördröjning.
+// Ljudet hörs `latens` sekunder efter att mediet passerat en punkt → visa texten för det som hörs just nu.
+function lyricTime(ct) {
+  let t = ct;
+  const sy = current?.song?.sync;
+  if (settings.autoSync !== false && sy && sy.applied) t = (t - sy.shiftSec) / sy.scale;
+  t += liveOffsetMs / 1000;
+  t -= (settings.avLatencyMs || 0) / 1000;
+  if (settings.autoLatency !== false) t -= engine.latency();
+  return t;
+}
+
 let lastTimeText = '';
 function frame() {
+  if (calib.on) drawCalib();
   requestAnimationFrame(frame);
   if (current && !introActive) {
     const d = media.duration;
     const ct = media.currentTime;
     if (Number.isFinite(d) && d > 0) $('progressBar').style.transform = `scaleX(${(ct / d).toFixed(4)})`;
     if (current.mode === 'lyrics' && lyr.lines.length) {
-      const t = ct + liveOffsetMs / 1000;
+      const t = lyricTime(ct);
       const idx = findLineIdx(t);
       if (idx !== lyr.idx) renderLines(idx, t);
       else updateWords(t);
@@ -766,6 +787,7 @@ setInterval(() => {
   socket.emit('tv:state', {
     phase: introActive ? 'intro' : media.paused ? 'paused' : 'playing',
     t: media.currentTime || 0, d: Number.isFinite(media.duration) ? media.duration : 0, paused: media.paused,
+    lat: settings.autoLatency !== false ? Math.round(engine.latency() * 1000) / 1000 : 0,
   });
 }, 1000);
 
@@ -785,6 +807,42 @@ socket.on('state', (s) => {
 });
 socket.on('settings', applySettings);
 socket.on('tv:gain', ({ gainDb }) => { engine.songGainDb = gainDb || 0; engine.applyGain(); });
+socket.on('tv:sync', ({ sync }) => { if (current) { current.song.sync = sync; lyr.idx = -2; } });
+
+// ───────────────────────────── Kalibrering av ljudfördröjning ─────────────────────────────
+// Ett klick per sekund i högtalarna + en blixt på skärmen. Blixten visas när klicket HÖRS enligt nuvarande
+// inställningar (webbläsarlatens + TV/högtalar-fördröjning). Justera i värdpanelen tills de sammanfaller.
+const calib = { on: false, clicks: [], next: 0, out: null };
+socket.on('tv:calib', ({ on }) => {
+  calib.on = !!on;
+  $('calib').classList.toggle('hidden', !calib.on);
+  calib.clicks = [];
+  if (calib.on && engine.ctx) {
+    engine.resume();
+    calib.next = engine.ctx.currentTime + 0.5;
+    calib.out = engine.ctx.createGain();
+    calib.out.gain.value = settings.muted ? 0 : Math.pow(settings.volume ?? 0.85, 2);
+    calib.out.connect(engine.ctx.destination);
+  } else if (calib.out) { calib.out.disconnect(); calib.out = null; }
+});
+function drawCalib() {
+  const c = engine.ctx;
+  if (!c || !calib.out) return;
+  while (calib.next < c.currentTime + 0.3) { // schemalägg klick i förväg
+    const o = c.createOscillator(); const g = c.createGain();
+    o.frequency.value = 1500;
+    g.gain.setValueAtTime(0.9, calib.next); g.gain.exponentialRampToValueAtTime(0.001, calib.next + 0.04);
+    o.connect(g).connect(calib.out); o.start(calib.next); o.stop(calib.next + 0.05);
+    calib.clicks.push(calib.next);
+    calib.next += 1;
+  }
+  const lat = (settings.autoLatency !== false ? engine.latency() : 0) + (settings.avLatencyMs || 0) / 1000;
+  const heard = c.currentTime - lat;
+  calib.clicks = calib.clicks.filter((k) => k > heard - 1);
+  const flash = calib.clicks.some((k) => heard >= k && heard < k + 0.09);
+  $('calibDot').classList.toggle('on', flash);
+  $('calibVal').textContent = `${settings.avLatencyMs || 0} ms${settings.autoLatency !== false ? ` + auto ${Math.round(engine.latency() * 1000)} ms` : ''}`;
+}
 setInterval(() => { if (socket.connected) socket.emit('tv:beat'); }, 5000);
 socket.on('offset', ({ liveOffsetMs: v }) => { liveOffsetMs = v; lyr.idx = -2; });
 socket.on('tv:load', (p) => { if (p?.song) loadSong(p); });

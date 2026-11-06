@@ -134,7 +134,7 @@
 
   // ───────────────────────────── Sheet ─────────────────────────────
   function openSheet(...nodes) {
-    $('sheetBody').replaceChildren(...nodes);
+    $('sheetBody').replaceChildren(...nodes.filter(Boolean));
     $('sheet').classList.remove('hidden');
     $('sheet').setAttribute('aria-hidden', 'false');
   }
@@ -242,7 +242,7 @@
   function drawLyricsView() {
     const L = lv.lines;
     if (!L.length) return;
-    const t = estimatePlaybackTime() + (S.liveOffsetMs || 0) / 1000;
+    const t = lyricTimeNow();
     let i = -1;
     for (let k = 0; k < L.length; k++) { if (L[k].t <= t) i = k; else break; }
     const textAt = (from, dir) => { for (let k = from; k >= 0 && k < L.length; k += dir) if (L[k].text) return k; return -1; };
@@ -392,7 +392,22 @@
     }
   });
 
+  // Samma tidsmodell som TV:n: autosynk (tempo/förskjutning) + manuell justering − ljudfördröjning
+  function lyricTimeNow() {
+    let t = estimatePlaybackTime();
+    const sy = S.now?.sync;
+    if (S.settings.autoSync !== false && sy?.applied) t = (t - sy.shiftSec) / sy.scale;
+    t += (S.liveOffsetMs || 0) / 1000;
+    t -= (S.settings.avLatencyMs || 0) / 1000;
+    t -= playback.lat || 0;
+    return t;
+  }
+
+  $('btnCalibStart').addEventListener('click', () => socket.emit('calib:set', { on: true }, (r) => (r?.error ? toast(r.error, 'error') : toast('🎯 Titta på TV:n och lyssna – justera reglaget tills blixt och klick sammanfaller', 'ok'))));
+  $('btnCalibStop').addEventListener('click', () => socket.emit('calib:set', { on: false }, ackToast));
+
   function renderLabels() {
+    $('avLatLabel').textContent = `${S.settings.avLatencyMs || 0} ms`;
     const s = S.settings;
     const p = s.pitch || 0;
     $('pitchLabel').textContent = `${p > 0 ? '+' : ''}${p} halvton${Math.abs(p) === 1 ? '' : 'er'}`;
@@ -1049,6 +1064,18 @@
     openSheet(
       h('h2', {}, '✏️ Låt- & textredigerare'),
       h('div', { class: 'sub' }, `Textkälla: ${src}${song.offsetMs ? ` · sparad synk ${fmtSec(song.offsetMs)}` : ''}`),
+      song.sync ? (() => {
+        const sy = song.sync;
+        const lbl = { high: 'hög', medium: 'medel', low: 'låg' }[sy.confidence] || '–';
+        const cb = h('input', { type: 'checkbox', checked: !sy.disabled });
+        cb.addEventListener('change', async () => {
+          try { await api(`/api/songs/${song.id}`, { method: 'PATCH', body: { syncDisabled: !cb.checked } }); toast(cb.checked ? '🎯 Autosynk på för låten' : 'Autosynk av för låten', 'ok'); }
+          catch (e) { toast(e.message, 'error'); cb.checked = !cb.checked; }
+        });
+        return h('div', { class: 'fallback' },
+          h('div', {}, `🎯 Autosynk: säkerhet ${lbl}${sy.applied || sy.confidence !== 'low' ? ` · förskjutning ${fmtSec(sy.shiftSec * 1000)} · tempo ${(sy.scale * 100).toFixed(1).replace('.', ',')} %` : ''}${sy.applied ? ' · används' : ' · används inte'}`),
+          sy.applied || sy.disabled ? h('label', { class: 'check' }, cb, 'Använd automatisk synk för den här låten') : null);
+      })() : null,
       h('div', { class: 'stack' },
         h('div', { class: 'grid2' }, artist, title),
         h('div', { class: 'tagpick' }, ...tagBoxes.map((x) => x.el)),
@@ -1087,6 +1114,7 @@
         s.systemd ? null : h('div', {}, '⚠️ Körs inte under systemd – ”Starta om” avslutar bara processen.'),
       ].filter(Boolean));
       $('cookieState').textContent = s.cookies ? '✓ inlagd' : 'ingen';
+      if (s.sync) $('syncStatus').textContent = `Status: ${s.sync.analyzed}/${s.sync.withLyrics} låtar analyserade, ${s.sync.applied} justerade${s.sync.pending ? `, ${s.sync.pending} i kö` : ''}.`;
     } catch (e) { box.textContent = e.message; }
     loadSinks();
   }
@@ -1160,7 +1188,7 @@
   function hostGate() {
     if (admin) {
       document.body.classList.remove('host-locked');
-      if (!hostReady) { hostReady = true; $('adv').open = true; showView('queue'); $('nowBar').classList.add('open'); loadSystem(); loadUpdate(); }
+      if (!hostReady) { hostReady = true; $('adv').open = true; showView('queue'); $('nowBar').classList.add('open'); loadSystem(); loadUpdate(); loadAutostart(); }
       return;
     }
     document.body.classList.add('host-locked');
@@ -1189,6 +1217,17 @@
     $('btnRollback').classList.toggle('hidden', !cur.hasBackup);
   }
   $('btnUpdCheck').addEventListener('click', loadUpdate);
+
+  async function loadAutostart() {
+    try { $('autostartToggle').checked = (await api('/api/system/autostart')).enabled; } catch { /* inte värd */ }
+  }
+  $('autostartToggle').addEventListener('change', async (e) => {
+    try {
+      const r = await api('/api/system/autostart', { method: 'POST', body: { enabled: e.target.checked } });
+      e.target.checked = r.enabled;
+      toast(r.enabled ? '✅ TV-vyn startar automatiskt med datorn' : '⏸️ Autostart avstängd', 'ok');
+    } catch (err) { toast(err.message, 'error'); e.target.checked = !e.target.checked; }
+  });
   $('btnUpdApply').addEventListener('click', (e) => armConfirm(e.currentTarget, async () => {
     $('btnUpdApply').disabled = true;
     try {
@@ -1203,7 +1242,7 @@
   }));
   socket.on('offset', ({ liveOffsetMs }) => { S.liveOffsetMs = liveOffsetMs; renderOffset(); });
   socket.on('playback', (p) => {
-    playback = { t: p.t, d: p.d, paused: p.paused, at: Date.now() };
+    playback = { t: p.t, d: p.d, paused: p.paused, lat: p.lat || 0, at: Date.now() };
     if (p.phase) S.phase = p.phase;
     renderProgress();
     setToggleIcons();
