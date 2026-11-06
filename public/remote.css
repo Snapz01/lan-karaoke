@@ -304,3 +304,6 @@ body.host #btnLyrics, body.host #myTurn { display: none !important; }
 .welcome input { text-align: center; }
 .warn-hint { color: var(--warn); }
 body.host .me-chip { display: none; }
+.sinks label small { color: var(--dim); font-size: .75rem; margin-left: auto; }
+.sinks label.dim { opacity: .55; }
+.sinks.busy { opacity: .5; pointer-events: none; }

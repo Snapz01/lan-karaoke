@@ -49,7 +49,7 @@ Ett självhostat karaokesystem för hemmafesten. En liten dator kopplas till TV:
 ### 🎛️ Värdpanel (på datorn)
 - Alla avancerade inställningar: tonartsändring, tempo, ljudnivå, EQ, rättvis kö och värdläge
 - Låt- och textredigering med **tap-synk**
-- Systemkontroll: disk, ljudutgång/HDMI, YouTube-cookies, cache, omstart
+- Systemkontroll: disk, **ljudutgång** (HDMI, hörlursuttag/AUX, USB, Bluetooth – valet sparas och återställs vid start), testljud, YouTube-cookies, cache, omstart
 - **Uppdatering från GitHub** med ett klick, med säkerhetskopia och möjlighet att ångra
 
 ![Värdpanel](docs/vardpanel.jpg)
@@ -80,7 +80,7 @@ Tre funktioner som kan slås på eller av var för sig i **värdpanelen → 🎯
 |---|---|
 | Dator | Mini-PC med Intel Celeron/Pentium och 4–8 GB RAM (testad på MSI Cubi N 8GL) |
 | System | Ubuntu 22.04, 24.04 eller 26.04 |
-| Bild och ljud | HDMI till TV:n. Ljudet går från TV:n till högtalaren. |
+| Bild och ljud | HDMI till TV:n. Ljud antingen via TV:n eller direkt från datorns 3,5 mm-uttag till högtalarens AUX IN (rekommenderas: kortare fördröjning, ingen TV-ljudbehandling). |
 | Mikrofoner | Kopplade direkt till högtalaren eller en mixer, så att sången inte får fördröjning |
 | Nätverk | Wi-Fi som gästerna kan ansluta till, och internet för att hämta låtar |
 
@@ -161,7 +161,7 @@ Låtar, kö, historik och inställningar påverkas aldrig av en uppdatering.
 
 | Problem | Lösning |
 |---|---|
-| Inget ljud | Värdpanelen → Systemkontroll → **Aktivera HDMI-ljud** |
+| Inget ljud | Värdpanelen → Systemkontroll → **Ljudutgång**: välj rätt utgång och tryck **🔔 Testljud**. AUX-kabel: utgång → ingång (två ingångar mot varandra ger inget ljud). |
 | Gästerna når inte sidan | Kontrollera att mobilen är på samma Wi-Fi som datorn |
 | "YouTube kräver inloggning" | Ladda upp en `cookies.txt` i värdpanelen |
 | Texten kommer fel | Använd **Snabb text-synk** och spara i värdpanelen |

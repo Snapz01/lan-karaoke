@@ -14,7 +14,7 @@ lan-karaoke/
 │   ├── ytdlp.js           yt-dlp-wrapper, cookies, svenska felmeddelanden
 │   ├── analysis.js        ffmpeg: loudness (EBU R128) + inledande tystnad → synkförslag
 │   ├── covers.js          Albumomslag via iTunes Search API (strypt, cachat)
-│   ├── system-audio.js    Ljudutgång/HDMI via pactl
+│   ├── system-audio.js    Ljudutgångar via pactl (sinks, portar, kortprofiler)
 │   ├── fair-queue.js      Rättvis kö (round-robin per sångare)
 │   └── tags.js            Språk- och genretaggning
 ├── public/
@@ -72,7 +72,7 @@ sudo bash setup-ubuntu.sh            # frågar om PIN och autologin
 | **Kön sparas** | Den skrivs till `data/queue.json`. Vid omstart läggs pågående låt först och avbrutna nedladdningar startas om. |
 | **Jämn ljudnivå** | ffmpeg `loudnorm` mäter varje låt en gång (nice 15, en åt gången) och TV:n förstärker eller dämpar mot −16 LUFS. Förstärkningen begränsas så att toppnivån inte går över 0 dBTP. Låtar från v1 analyseras i bakgrunden vid start. |
 | **Synkförslag** | Om YouTube-ljudet är minst 1,5 s längre än LRCLIB-versionen och börjar tyst föreslås en offset. Den kan godkännas med ett tryck. |
-| **HDMI** | Kiosken väljer HDMI-utgången vid inloggning (och igen efter 25 s). Systemkontroll visar alla utgångar och har knappen "Aktivera HDMI". |
+| **Ljudutgång** | Systemkontroll listar sinks per port och utgångar som kräver kortprofilbyte (t.ex. analog när Intel HDA står i HDMI-profilen – då finns ingen analog sink alls). Vid val av analog väljs hörlurs-/linjeporten, annars kan "Speaker" bli aktiv och tyst. Valet sparas i `data/audio-output.json`; kiosken återställer det vid inloggning och efter 25 s (`KIOSK_AUTO_HDMI=0` stänger av). Utan sparat val: HDMI. 🔔 Testljud spelar tre toner på TV-sidan. |
 | **YouTube-spärr** | Ladda upp en `cookies.txt` (Netscape-format) under Systemkontroll. yt-dlp-fel visas på svenska. |
 | **Rättvis kö** | Ingen får sin andra låt innan alla fått sin första. Gränsen för antal låtar per sångare är 3 som standard. Dubbletter avvisas. |
 | **Värdläge** | Kräver PIN. Gäster kan inte styra uppspelningen eller ändra inställningar. De kan rösta för att hoppa över (50 % av mobilerna, minst 2), ta bort sina egna låtar och hoppa över sin egen låt. |

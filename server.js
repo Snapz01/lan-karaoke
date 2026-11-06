@@ -24,7 +24,7 @@ import {
 } from './lib/ytdlp.js';
 import { analyzeFile, gainFor, suggestOffsetMs, analysisQueueLength } from './lib/analysis.js';
 import { lookupCover, cachedCover, pendingLookups, downloadCover, flushCoverCache } from './lib/covers.js';
-import { listSinks, setDefaultSink, enableHdmi } from './lib/system-audio.js';
+import { listOutputs, selectOutput, restoreOutput } from './lib/system-audio.js';
 import { fairInsertIndex, countForSinger, singerKey } from './lib/fair-queue.js';
 import { currentVersion, checkUpdate, applyUpdate, rollback } from './lib/updater.js';
 import { analyzeSync } from './lib/autosync.js';
@@ -850,15 +850,33 @@ app.post('/api/system/restart', requireAdmin, (req, res) => {
   io.emit('toast', { type: 'info', msg: 'Tjänsten startar om – kön sparas…' });
   setTimeout(() => shutdown('restart'), 400);
 });
+// Ljudutgång: valet sparas i data/audio-output.json och återställs av kiosk-skriptet vid start.
+// Äldre kiosk-skript skickar { hdmi: true } – tolkas som "återställ sparat val" (HDMI om inget sparats).
+const audioPref = new JsonStore(path.join(C.DATA_DIR, 'audio-output.json'), { pref: null });
 app.get('/api/system/audio', requireAdmin, async (req, res) => {
-  try { res.json(await listSinks()); } catch (e) { res.status(503).json({ error: `Ljudservern nås inte: ${e.message}` }); }
+  try { res.json({ ...(await listOutputs()), saved: audioPref.data.pref }); }
+  catch (e) { res.status(503).json({ error: `Ljudservern nås inte: ${e.message}` }); }
 });
 app.post('/api/system/audio', requireAdmin, async (req, res) => {
   try {
-    if (req.body?.hdmi) { const s = await enableHdmi(); return res.json({ ok: true, sink: s.name, description: s.description }); }
-    await setDefaultSink(String(req.body?.sink || ''));
-    res.json({ ok: true, sink: req.body.sink });
+    const b = req.body || {};
+    if (b.output) {
+      const r = await selectOutput(String(b.output));
+      audioPref.data.pref = { kind: r.kind, sink: r.sink, port: r.port, mapping: r.mapping, description: r.description };
+      audioPref.flush();
+      return res.json({ ok: true, ...r });
+    }
+    if (b.restore || b.hdmi) {
+      const r = await restoreOutput(audioPref.data.pref);
+      return res.json({ ok: true, sink: r.sink || r.name, description: r.description });
+    }
+    res.status(400).json({ error: 'Ange output eller restore' });
   } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post('/api/system/audio/test', requireAdmin, (req, res) => {
+  if (!tvSockets.size) return res.status(409).json({ error: 'TV-vyn är inte öppen – starta Karaoke TV först' });
+  io.to('tv').emit('tv:testTone');
+  res.json({ ok: true });
 });
 // Autostart av TV-vyn vid inloggning (flaggfil som kiosk-skriptet läser). Av som standard.
 const AUTOSTART_FLAG = path.join(os.homedir(), '.config', 'karaoke-kiosk.autostart');

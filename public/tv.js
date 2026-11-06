@@ -802,6 +802,20 @@ socket.on('state', (s) => {
   renderQueueInfo();
 });
 socket.on('settings', applySettings);
+// Testljud från värdpanelen (vid byte av ljudutgång): tre toner direkt till utgången, oberoende av mute/volym i appen
+socket.on('tv:testTone', async () => {
+  const ctx = engine.ctx;
+  if (!ctx) return;
+  try { await ctx.resume(); } catch { /* ignoreras */ }
+  const t0 = ctx.currentTime + 0.05;
+  [523.25, 659.25, 783.99].forEach((f, i) => {
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.frequency.value = f; o.type = 'triangle';
+    const t = t0 + i * 0.32;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.32);
+  });
+});
 socket.on('tv:gain', ({ gainDb }) => { engine.songGainDb = gainDb || 0; engine.applyGain(); });
 socket.on('tv:sync', ({ sync }) => { if (current) { current.song.sync = sync; lyr.idx = -2; } });
 

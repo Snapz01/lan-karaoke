@@ -1121,19 +1121,28 @@
     const box = $('sinkList');
     try {
       const r = await api('/api/system/audio');
-      if (!r.sinks.length) { box.replaceChildren(h('small', { class: 'hint' }, 'Inga ljudutgångar hittades')); return; }
-      box.replaceChildren(...r.sinks.map((sk) => {
-        const radio = h('input', { type: 'radio', name: 'sink', checked: sk.name === r.default });
+      if (!r.outputs.length) { box.replaceChildren(h('small', { class: 'hint' }, 'Inga ljudutgångar hittades')); return; }
+      box.replaceChildren(...r.outputs.map((o) => {
+        const radio = h('input', { type: 'radio', name: 'sink', checked: o.active });
         radio.addEventListener('change', async () => {
-          try { await api('/api/system/audio', { method: 'POST', body: { sink: sk.name } }); toast(`🔊 Ljud via ${sk.description}`, 'ok'); loadSinks(); }
-          catch (e) { toast(e.message, 'error'); }
+          box.classList.add('busy');
+          try {
+            const res = await api('/api/system/audio', { method: 'POST', body: { output: o.id } });
+            toast(`🔊 Ljud via ${o.label.replace(/^\S+\s/, '')}`, 'ok');
+            api('/api/system/audio/test', { method: 'POST' }).catch(() => {});
+            if (res.kind === 'analog') toast('🎧 Analogt: använd högtalarens volym, inte TV:ns', 'info');
+          } catch (e) { toast(e.message, 'error'); }
+          box.classList.remove('busy');
+          loadSinks();
         });
-        return h('label', { class: sk.name === r.default ? 'on' : '' }, radio, `${sk.hdmi ? '📺 ' : '🔈 '}${sk.description}`);
+        const note = o.available === 'no' ? ' (ej inkopplad)' : o.needsProfile ? ' (avstängd – aktiveras vid val)' : '';
+        return h('label', { class: `${o.active ? 'on' : ''}${o.available === 'no' ? ' dim' : ''}` }, radio, o.label, note ? h('small', {}, note) : null);
       }));
     } catch (e) { box.replaceChildren(h('small', { class: 'hint' }, e.message)); }
   }
-  $('btnHdmi').addEventListener('click', async () => {
-    try { const r = await api('/api/system/audio', { method: 'POST', body: { hdmi: true } }); toast(`📺 Ljud via ${r.description || 'HDMI'}`, 'ok'); loadSinks(); }
+  $('btnSinkRefresh').addEventListener('click', loadSinks);
+  $('btnTestTone').addEventListener('click', async () => {
+    try { await api('/api/system/audio/test', { method: 'POST' }); toast('🔔 Testljud skickat – hörs tre toner?', 'ok'); }
     catch (e) { toast(e.message, 'error'); }
   });
   $('cookieFile').addEventListener('change', async (e) => {

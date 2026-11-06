@@ -192,7 +192,12 @@ body.celebrating #lyrics { opacity: 0; transition: opacity .3s; }
 @keyframes eqb { from { transform: scaleY(.15); } to { transform: scaleY(1); } }
 #idle .qrbig { padding: 1.6vw; text-align: center; }
 #idle .qrrow { display: flex; gap: 1.6vw; }
-#idle .qrrow:has(#wifiCard:not(.hidden)) .qrbig img { width: 15vw; height: 15vw; }
+/* Wi-Fi-QR längst till vänster, app-QR längst till höger – långt isär så kameran inte fångar båda */
+#idle:has(#wifiCard:not(.hidden)) { gap: 4vw; justify-content: space-between; padding: 0 3vw; }
+#idle:has(#wifiCard:not(.hidden)) .left { max-width: 38vw; flex: 1; }
+#idle:has(#wifiCard:not(.hidden)) h1 { font-size: 4.8vw; }
+#idle:has(#wifiCard:not(.hidden)) .qrbig img { width: 17vw; height: 17vw; }
+#wifiCard { align-self: center; }
 #idle .step { font-size: 1.4vw; font-weight: 700; margin-bottom: 1vw; color: var(--base); }
 #wifiText { margin-top: 1vw; font-size: 1.1vw; color: var(--dim); line-height: 1.5; }
 #wifiText b { color: var(--accent2); }

@@ -185,6 +185,9 @@ URL="http://localhost:$PORT/tv"
 EOF
 cat >>/usr/local/bin/karaoke-kiosk <<'EOF'
 [[ -f "$HOME/.config/karaoke-kiosk.disabled" ]] && exit 0
+# Vid inloggning startar kiosken bara om "Starta med datorn" är påslaget i värdpanelen (av som standard)
+if [[ "${1:-}" == "--autostart" && ! -f "$HOME/.config/karaoke-kiosk.autostart" ]]; then exit 0; fi
+pgrep -f -- "--kiosk http://localhost" >/dev/null && exit 0   # redan igång
 BASE="${URL%/tv}"
 # PIN och inställningar (filen är läsbar för skrivbordsanvändarens grupp)
 [[ -r /etc/default/lan-karaoke ]] && . /etc/default/lan-karaoke
@@ -192,10 +195,11 @@ BASE="${URL%/tv}"
 # Vänta på servern (max 90 s)
 for _ in $(seq 1 90); do curl -fs "$BASE/api/info" >/dev/null 2>&1 && break; sleep 1; done
 
-# HDMI-ljud: Ubuntu väljer ofta hörlursutgången på mini-PC:ar. Servern aktiverar HDMI-profilen och flyttar strömmar.
+# Ljudutgång: återställ utgången som valts i värdpanelen (HDMI om inget valts). Servern byter kortprofil och flyttar strömmar.
+# KIOSK_AUTO_HDMI=0 stänger av återställningen helt (namnet behållet för bakåtkompatibilitet).
 select_hdmi() {
   [[ "${KIOSK_AUTO_HDMI:-1}" == "1" ]] || return 0
-  curl -fs -X POST -H 'content-type: application/json' -H "x-karaoke-pin: ${KARAOKE_PIN:-}" -d '{"hdmi":true}' "$BASE/api/system/audio" >/dev/null 2>&1 || true
+  curl -fs -X POST -H 'content-type: application/json' -H "x-karaoke-pin: ${KARAOKE_PIN:-}" -d '{"restore":true}' "$BASE/api/system/audio" >/dev/null 2>&1 || true
 }
 select_hdmi
 ( sleep 25; select_hdmi ) &   # TV:n kan vakna efter datorn
@@ -268,12 +272,25 @@ cat >"$AUTOSTART_DIR/karaoke-kiosk.desktop" <<EOF
 Type=Application
 Name=LAN Karaoke Kiosk
 Comment=Startar karaoke-TV-vyn i helskärm
-Exec=/usr/local/bin/karaoke-kiosk
+Exec=/usr/local/bin/karaoke-kiosk --autostart
 X-GNOME-Autostart-enabled=true
 X-GNOME-Autostart-Delay=3
 NoDisplay=false
 EOF
 chown -R "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/.config"
+
+# Menygenväg för att starta TV-vyn manuellt (när autostart är avstängt)
+mkdir -p "$TARGET_HOME/.local/share/applications"
+cat >"$TARGET_HOME/.local/share/applications/karaoke-tv.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Karaoke TV
+Comment=Starta karaoke-TV-vyn i helskärm
+Exec=/usr/local/bin/karaoke-kiosk
+Icon=$INSTALL_DIR/public/icon-192.png
+Terminal=false
+Categories=AudioVideo;
+DESKTOP
 
 # Genväg till värdpanelen på karaokedatorn (eget fönster, växla med Alt+Tab)
 APPS_DIR="$TARGET_HOME/.local/share/applications"
@@ -326,5 +343,6 @@ echo "   Mobil:       http://${LAN_IP:-<LAN-IP>}:$PORT/remote"
 echo "   Loggar:      journalctl -u lan-karaoke -f"
 echo "   Värdpanel:   http://localhost:$PORT/host  (appen \"Karaoke Värdpanel\" i programmenyn)"
 echo "   Konfig:      $ENV_FILE"
-echo "   Stäng kiosk: touch ~/.config/karaoke-kiosk.disabled && pkill -f karaoke-kiosk"
+echo "   Autostart:   AV som standard – slå på i värdpanelen (Kiosk & TV → Starta med datorn)"
+echo "   Starta TV:   appen \"Karaoke TV\" i programmenyn · Stäng: pkill -f karaoke-kiosk"
 echo "   HW-avkodning: kontrollera 'Video Decode: Hardware accelerated' på chrome://gpu"
