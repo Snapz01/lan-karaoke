@@ -4,6 +4,10 @@
 
 Ett självhostat karaokesystem för hemmafesten. En liten dator kopplas till TV:n, och gästerna skannar en QR-kod, söker låtar, ställer sig i kön och peppar varandra med emojis. Allt är på svenska och fungerar i det lokala nätverket, utan konton och utan appar att installera.
 
+> **OBS!** Systemet är byggt för en **MSI Cubi N 8GL** (Intel Celeron/Pentium, Intel UHD 600, 4–8 GB RAM) med **Ubuntu**, och är därför gjort för att vara resurssnålt: lätta animationer, ingen tung grafik och nedladdningar med låg prioritet. Det fungerar på annan hårdvara också, men har inte testats där.
+>
+> 💬 **Problem eller feedback?** Hör gärna av er via [GitHub Issues](https://github.com/SNAPZ01/lan-karaoke/issues). Alla förslag och felrapporter är välkomna!
+
 ![Låttext på TV:n](docs/tv-text.jpg)
 
 ---
@@ -137,6 +141,8 @@ Låtar, kö, historik och inställningar påverkas aldrig av en uppdatering.
 | Texten kommer fel | Använd **Snabb text-synk** och spara i värdpanelen |
 | Videon hackar | Ställ datorns upplösning på 1920×1080 i stället för 4K |
 | Något annat | `journalctl -u lan-karaoke -n 100 --no-pager` |
+
+Hittar du inte lösningen? [Skapa ett ärende](https://github.com/SNAPZ01/lan-karaoke/issues/new) och bifoga utdata från kommandot ovan.
 
 ---
 
