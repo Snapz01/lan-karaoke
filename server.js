@@ -49,7 +49,7 @@ const DEFAULT_SETTINGS = {
   qrVisible: true, reactionsEnabled: true, overscan: 0, autoPlay: true,
   introSeconds: 5, maxVideoHeight: 720, preferInstrumental: false,
   fairQueue: true, maxPerSinger: 3, hostMode: false, voteSkipPercent: 50, wifiQrVisible: true,
-  autoSync: true, autoLatency: true, avLatencyMs: 0,
+  autoSync: true, autoLatency: true, avLatencyMs: 0, autoUpdate: false,
 };
 const settingsStore = new JsonStore(C.SETTINGS_FILE, DEFAULT_SETTINGS);
 const settings = settingsStore.data;
@@ -81,6 +81,7 @@ const SETTING_RULES = {
   hostMode: (v) => !!v,
   voteSkipPercent: (v) => clamp(Math.round(num(v, 50)), 25, 100),
   wifiQrVisible: (v) => !!v,
+  autoUpdate: (v) => !!v,
   autoSync: (v) => !!v,
   autoLatency: (v) => !!v,
   avLatencyMs: (v) => clamp(Math.round(num(v) / 10) * 10, -300, 800),
@@ -825,7 +826,8 @@ app.get('/api/system', requireAdmin, async (req, res) => {
 app.post('/api/system/clear-cache', requireAdmin, async (req, res) => res.json(await pruneCache({ all: true })));
 // ── Uppdatering från GitHub ──
 app.get('/api/system/update', requireAdmin, async (req, res) => {
-  try { res.json(await checkUpdate()); } catch (e) { res.status(400).json({ error: e.message, current: currentVersion() }); }
+  try { res.json({ ...(await checkUpdate()), auto: autoUpd.status() }); }
+  catch (e) { res.status(400).json({ error: e.message, current: currentVersion(), auto: autoUpd.status() }); }
 });
 app.post('/api/system/update', requireAdmin, async (req, res) => {
   try {
@@ -837,6 +839,53 @@ app.post('/api/system/update', requireAdmin, async (req, res) => {
     }
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// Automatisk uppdatering (av som standard): kollar GitHub varje timme och installerar först när det varit
+// lugnt i 15 min – ingen låt, tom kö, inga nedladdningar – så en pågående kväll aldrig avbryts.
+const autoUpd = (() => {
+  const CHECK_MS = 60 * 60 * 1000, QUIET_MS = 15 * 60 * 1000;
+  const st = { lastCheck: null, lastError: null, pending: null, failedSha: null, busyAt: Date.now() };
+  const busy = () => !!player.now || player.queue.length > 0 || [...jobs.values()].some((j) => j.status === 'running' || j.status === 'queued');
+  let checking = false;
+  async function tick() {
+    if (busy()) st.busyAt = Date.now();
+    if (!settings.autoUpdate || !C.UPDATE_REPO || checking || shuttingDown) return;
+    checking = true;
+    try {
+      if (!st.lastCheck || Date.now() - st.lastCheck >= CHECK_MS) {
+        st.lastCheck = Date.now();
+        const info = await checkUpdate();
+        st.pending = info.available && info.latest.sha !== st.failedSha ? info.latest : null;
+        st.lastError = null;
+      }
+      if (st.pending && Date.now() - st.busyAt >= QUIET_MS) {
+        console.log(`[auto-uppdatering] Installerar ${st.pending.sha.slice(0, 7)} – ${st.pending.message}`);
+        const r = await applyUpdate((stage) => io.emit('update:stage', { stage }));
+        if (r.updated) {
+          io.emit('toast', { type: 'info', msg: '🔄 Ny version installerad automatiskt – startar om…' });
+          setTimeout(() => shutdown('auto-update'), 800);
+        }
+        st.pending = null;
+      }
+    } catch (e) {
+      st.lastError = e.message;
+      if (st.pending) { st.failedSha = st.pending.sha; st.pending = null; } // försök inte samma version igen varje timme
+      console.error('[auto-uppdatering]', e.message);
+    } finally { checking = false; }
+  }
+  setTimeout(tick, 2 * 60 * 1000).unref();
+  setInterval(tick, 60 * 1000).unref();
+  return {
+    tick,
+    status: () => ({
+      enabled: !!settings.autoUpdate, repo: !!C.UPDATE_REPO, lastCheck: st.lastCheck, lastError: st.lastError,
+      pending: st.pending ? { sha: st.pending.sha, message: st.pending.message } : null,
+      quietInMin: Math.max(0, Math.ceil((QUIET_MS - (Date.now() - st.busyAt)) / 60000)),
+    }),
+    _state: st,
+  };
+})();
+globalThis.__autoUpd = autoUpd; // för tester
+
 app.post('/api/system/rollback', requireAdmin, async (req, res) => {
   try {
     res.json(await rollback());
@@ -1051,7 +1100,8 @@ io.on('connection', (socket) => {
     settingsStore.save();
     io.emit('settings', settings);
     if ('hostMode' in applied || 'fairQueue' in applied || 'voteSkipPercent' in applied) broadcastState();
-    if (applied.autoSync) for (const s of Object.values(songs())) syncSong(s.id); // slogs på → analysera det som saknas
+    if (applied.autoSync) for (const s of Object.values(songs())) syncSong(s.id);
+    if (applied.autoUpdate) { autoUpd._state.lastCheck = null; autoUpd.tick(); } // slogs på → analysera det som saknas
     ack(cb, { ok: true, applied });
   });
 

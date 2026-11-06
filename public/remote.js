@@ -1253,8 +1253,19 @@
       h('div', {}, r.available ? h('b', { style: 'color:var(--ok)' }, '✨ Ny version finns!') : '✅ Du har senaste versionen'));
     $('btnUpdApply').disabled = !r.available;
     $('btnRollback').classList.toggle('hidden', !cur.hasBackup);
+    renderAutoUpd(r.auto);
+  }
+  function renderAutoUpd(a) {
+    const el = $('autoUpdInfo');
+    if (!a || !a.enabled) { el.textContent = 'Av som standard. Kollar GitHub varje timme och installerar bara när det varit lugnt i 15 min (ingen låt spelas, tom kö, inga nedladdningar). Kön och inställningar sparas; ↩️ ångrar.'; return; }
+    const t = (ms) => new Date(ms).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+    el.textContent = !a.repo ? '⚠️ UPDATE_REPO saknas i /etc/default/lan-karaoke'
+      : a.lastError ? `⚠️ Senaste försöket misslyckades: ${a.lastError}`
+      : a.pending ? `⏳ ${a.pending.sha.slice(0, 7)} installeras när det varit lugnt${a.quietInMin ? ` (om ≥ ${a.quietInMin} min)` : ''}`
+      : a.lastCheck ? `✅ På · senast kollat ${t(a.lastCheck)} · nästa koll inom en timme` : '✅ På · första kollen sker inom några minuter';
   }
   $('btnUpdCheck').addEventListener('click', loadUpdate);
+  document.querySelector('[data-setting="autoUpdate"]').addEventListener('change', () => setTimeout(loadUpdate, 4000));
 
   async function loadAutostart() {
     try { $('autostartToggle').checked = (await api('/api/system/autostart')).enabled; } catch { /* inte värd */ }

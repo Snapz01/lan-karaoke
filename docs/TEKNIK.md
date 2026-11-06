@@ -100,6 +100,7 @@ Gästerna (`/remote`) ser bara det enkla: sök, kö, reaktioner, textstorlek, te
    5. `npm install` körs om beroendena ändrats.
    6. Tjänsten startas om.
 4. **Återställ föregående version** ångrar den senaste uppdateringen.
+5. **Uppdatera automatiskt** (av som standard): kollar GitHub varje timme (1 API-anrop, långt under gränsen 60/h) och installerar först när det varit lugnt i 15 min – ingen låt spelas, tom kö, inga nedladdningar. En version som misslyckas försöks inte igen förrän en nyare finns. Status visas under knappen.
 
 ## Arkitekturbeslut
 

@@ -50,7 +50,7 @@ Ett självhostat karaokesystem för hemmafesten. En liten dator kopplas till TV:
 - Alla avancerade inställningar: tonartsändring, tempo, ljudnivå, EQ, rättvis kö och värdläge
 - Låt- och textredigering med **tap-synk**
 - Systemkontroll: disk, **ljudutgång** (HDMI, hörlursuttag/AUX, USB, Bluetooth – valet sparas och återställs vid start), testljud, YouTube-cookies, cache, omstart
-- **Uppdatering från GitHub** med ett klick, med säkerhetskopia och möjlighet att ångra
+- **Uppdatering från GitHub** med ett klick, med säkerhetskopia och möjlighet att ångra. Valfritt: **automatisk uppdatering** som bara installerar när det varit lugnt i 15 min (av som standard)
 
 ![Värdpanel](docs/vardpanel.jpg)
 
