@@ -111,7 +111,7 @@ sudo systemctl restart lan-karaoke
 | `KARAOKE_PIN` | PIN för värdpanelen från andra enheter (och värdläge) |
 | `WIFI_SSID`, `WIFI_PASSWORD` | Wi-Fi-QR på TV:n |
 | `WIFI_SHOW_PASSWORD` | `0` = visa bara QR-koden, inte lösenordet i text |
-| `UPDATE_REPO` | GitHub-repo för uppdateringar, t.ex. `SNAPZ01/lan-karaoke` |
+| `UPDATE_REPO` | GitHub-repo för uppdateringar, t.ex. `ditt-namn/lan-karaoke` |
 | `UPDATE_TOKEN` | Bara om repot är privat |
 | `CACHE_MAX_GB` | Max utrymme för karaoke-videor (standard 10) |
 | `COVERS_ONLINE` | `0` = hämta inga albumomslag från internet |
@@ -149,6 +149,14 @@ npm test        # enhetstester (node:test)
 ```
 
 Arkitektur, moduler och tekniska beslut beskrivs i **[docs/TEKNIK.md](docs/TEKNIK.md)**.
+
+---
+
+## 🤖 Byggd med Claude
+
+Hela systemet är byggt i en konversation med **Claude Opus 5.5** från Anthropic. Hög resonemangsnivå användes för arkitektur och större funktioner, låg för små ändringar. Det gäller kod, design, tester, installer och den här README:n.
+
+Vill du bygga ett eget? **[Här finns hela prompten och alla uppföljningar → docs/PROMPT.md](docs/PROMPT.md)**, med tips om hur du får bäst resultat.
 
 ---
 
