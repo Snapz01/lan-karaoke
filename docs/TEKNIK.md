@@ -19,7 +19,7 @@ lan-karaoke/
 │   └── tags.js            Språk- och genretaggning
 ├── public/
 │   ├── lrc.js             Delad parser: LRC, Enhanced LRC, duett-röster, VTT
-│   ├── tv.html  tv.js  style.css  pitch-worklet.js
+│   ├── tv.html  tv.js  style.css  pitch-worklet.js  vocal-worklet.js
 │   ├── remote.html  remote.js  remote.css  manifest.webmanifest
 │   ├── fonts/             Outfit (SIL OFL 1.1, se Outfit-OFL.txt)
 │   └── favicon.svg, icon-*.png, apple-touch-icon.png
@@ -110,6 +110,7 @@ Gästerna (`/remote`) ser bara det enkla: sök, kö, reaktioner, textstorlek, te
 | JSON i stället för SQLite | Ingen kompilering av inbyggda moduler på Celeron. Atomisk skrivning räcker för tusentals låtar. |
 | Textreserv från YouTube-undertexter | Ljudet tas från samma video som undertexterna, annars hamnar texten ur synk. |
 | Ägarskap via HMAC-tagg | Mobilens klient-id skickas aldrig till andra mobiler. Statusen innehåller bara `owner`-taggen, så ingen kan ta bort andras låtar genom att utge sig för att vara dem. |
+| Spektral sångdämpning (`vocal-worklet.js`) | Gamla L−R-metoden tog bort allt i mitten (bas, kick, virvel) och gav tystnad på monolåtar – upplevdes som volymsänkning. Nu: STFT 2048/hop 512, per frekvensband jämförs L och R; bara mittpanorerat innehåll i 120 Hz–8 kHz tas bort. Bas under 120 Hz orörd. Kostar uppskattningsvis 5–8 % av en kärna på Celeron och 43 ms latens (kompenseras i textsynken). Monolåtar detekteras och rapporteras till mobilen. |
 | pactl med `LC_ALL=C` | Annars översätts fältnamnen (t.ex. "Namn:" på svenska) och tolkningen går sönder. |
 
 ## Kända begränsningar
@@ -117,6 +118,6 @@ Gästerna (`/remote`) ser bara det enkla: sök, kö, reaktioner, textstorlek, te
 - Kör TV:n i **1920×1080**, inte 4K.
 - Hårdvaruavkodning av video beror på Chromium-versionen. Kontrollera `chrome://gpu`.
 - **Hemskärmsapp över http**: Android visar inte "Installera app", eftersom det kräver https. "Lägg till på startskärmen" fungerar ändå, och på iOS öppnas sidan i helskärm.
-- Tonartsändringen ger lätta artefakter vid ±5–6 halvtoner. Sångdämpningen fungerar bara när sången är mixad i mitten.
+- Tonartsändringen ger lätta artefakter vid ±5–6 halvtoner. Sångdämpningen tar bort det som ligger i mitten av stereobilden: sång försvinner, men även mittpanorerade solon kan dämpas, och eko/reverb på rösten kan ligga kvar svagt. Monoinspelningar kan inte separeras – välj Karaoke-text.
 - iTunes-omslag kräver internet på Cubi-datorn. Stäng av med `COVERS_ONLINE=0`.
 - `package-lock.json` saknas. Skapa den med `npm install` första gången och checka in den.

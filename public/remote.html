@@ -16,7 +16,10 @@
 <body>
   <header class="top">
     <div class="brand">🎤 <b>LAN</b> Karaoke <span class="host-only host-tag">Värdpanel</span></div>
-    <div class="conn" id="conn"><i></i><span>Ansluter…</span></div>
+    <div class="top-right">
+      <button class="me-chip" id="meChip" aria-label="Byt namn">🎤 <span id="meName">Ange namn</span></button>
+      <div class="conn" id="conn"><i></i><span>Ansluter…</span></div>
+    </div>
   </header>
 
   <!-- Nu spelas: kompakt rad, fälls ut till fulla kontroller -->
@@ -69,11 +72,6 @@
           <button data-cat="rockpop"><b>🎸</b>Rock &amp; pop</button>
         </div>
         <div class="chips hidden" id="suggestions"></div>
-        <div class="explain">
-          <div><b>🎤 Sjung med artist</b><span>Originallåten – texten fylls i takt på TV:n. Sänk artistens röst under Inställningar.</span></div>
-          <div><b>📺 Karaoke-text</b><span>Karaokeversion utan sång, texten är inbränd i videon.</span></div>
-          <div><b>⚡ Spela direkt</b><span>Låtar som redan finns på datorn – startar utan väntan.</span></div>
-        </div>
       </div>
       <div class="list" id="searchResults"></div>
     </section>
@@ -163,7 +161,8 @@
             <button data-v="0.6">🔉 Svag</button>
             <button data-v="1">🔇 Av</button>
           </div>
-          <small class="hint">”Svag” ger stöd att följa, ”Av” blir riktig karaoke. Fungerar bäst på studioinspelningar – Karaoke-text-videor saknar redan sång.</small>
+          <small class="hint">”Svag” ger stöd att följa, ”Av” tar bort sången men behåller musiken. Fungerar bäst på studioinspelningar i stereo – Karaoke-text-videor saknar redan sång.</small>
+          <small class="hint warn-hint hidden" id="monoHint">⚠️ Den här låten är inspelad i mono – sången går inte att skilja från musiken. Välj en <b>Karaoke-text</b>-version istället.</small>
         </div>
 
         <div class="setting">

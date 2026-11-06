@@ -17,6 +17,7 @@ Ett självhostat karaokesystem för hemmafesten. En liten dator kopplas till TV:
 ### 📺 På TV:n
 - **Låttext som fylls i takt** med musiken, ord för ord, med nedräkning 3-2-1 inför varje vers
 - **Intro-kort** som visar vem som sjunger härnäst
+- **"🎤 Gör dig redo"-skylt** med nästa sångares namn i stor text de sista 20 sekunderna av låten före
 - **Emoji-reaktioner** från publiken (🔥 👏 ❤️ 🎉 🍺 😂) och en **applådmätare** när låten är slut
 - **Konfetti och fanfar** när en låt sjungits klart
 - **Duetter**: rader märkta med `M:`/`F:` eller `Alla:` färgas per röst
@@ -28,15 +29,16 @@ Ett självhostat karaokesystem för hemmafesten. En liten dator kopplas till TV:
 | ![Vänteläge](docs/tv-vantelage.jpg) | ![Firande](docs/tv-firande.jpg) |
 
 ### 📱 I mobilen (gäster)
-- **Ett sökfält för allt**. Sökningen startar medan man skriver och visar tre sorters träffar:
+- **Namnruta vid första besöket**: gästen skriver sitt namn en gång, det visas sedan uppe till höger och på TV:n när det är dags
+- **Ett sökfält för allt**. Sökningen startar medan man skriver och visar tre sorters träffar (rubrikerna syns bara när det finns träffar):
   - ⚡ **Spela direkt**: låtar som redan finns på datorn
   - 🎤 **Sjung med artist**: originallåten med synkad text
   - 📺 **Karaoke-text**: karaokevideor utan sång
 - **＋ direkt i kön** med ett tryck
-- **🎲 Överraska mig**: slumpar en låt. Låtar du valt bort visas inte igen på en timme.
+- **🎲 Överraska mig**: helt slumpmässigt urval. En låt som visats för dig kommer inte igen på en timme, och låtar som redan sjungits ikväll eller ligger i kön hoppas över.
 - **"Min tur"**: "Du är 3:e i kön – om ca 9 min", och telefonen vibrerar när det är din tur
 - **Texten i mobilen** för den som sjunger vänd mot publiken
-- **Artistens röst**: Full, Svag eller Av
+- **Artistens röst**: Full, Svag eller Av. Rösten tas bort med spektral analys (frekvens för frekvens), så bas, trummor och komp ligger kvar. Fungerar på stereolåtar; för monoinspelningar visas en varning och Karaoke-text-versionen rekommenderas.
 - **Topplistor**: kvällens och alla tiders mest sjungna låtar och flitigaste sångare
 - **Snabb text-synk** om texten kommer för tidigt eller för sent
 
@@ -51,6 +53,17 @@ Ett självhostat karaokesystem för hemmafesten. En liten dator kopplas till TV:
 - **Uppdatering från GitHub** med ett klick, med säkerhetskopia och möjlighet att ångra
 
 ![Värdpanel](docs/vardpanel.jpg)
+
+### 🎯 Synk mellan låt och text
+Tre funktioner som kan slås på eller av var för sig i **värdpanelen → 🎯 Synk**:
+
+| Funktion | Vad den gör | Standard |
+|---|---|---|
+| **Automatisk synk med röstanalys** | Analyserar sången i varje låt en gång och rättar skillnader i intro och tempo mellan YouTube-ljudet och texten. Ändrar bara när träffen är säker, annars visas ett förslag. Kan stängas av per låt i textredigeraren. | På |
+| **Automatisk latenskompensation** | Räknar bort webbläsarens ljudbuffert och tonartsändringens fördröjning | På |
+| **Ljudfördröjning TV/högtalare** | En gemensam justering för hela uppkopplingen. **🎯 Kalibrera på TV:n** visar en blixt och spelar ett klick, och du justerar tills de kommer samtidigt. | 0 ms |
+
+> Tips: Kalibrera en gång när datorn, TV:n och högtalaren är på plats. Ljud som går via TV:n till en högtalare kommer ofta 50–200 ms efter bilden.
 
 ### 🧠 Funktioner i bakgrunden
 - **Smart textsökning** för svenska och engelska låtar (hanterar å/ä/ö, "Remastered", "Live" med mera)

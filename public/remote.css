@@ -295,3 +295,12 @@ body.host-locked main, body.host-locked .now { filter: blur(6px); pointer-events
   body.host .sheet-panel { max-width: 640px; margin: 0 auto; border-radius: 22px 22px 0 0; }
 }
 body.host #btnLyrics, body.host #myTurn { display: none !important; }
+
+/* ── Namn ── */
+.top-right { display: flex; align-items: center; gap: 10px; }
+.me-chip { padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: .82rem; font-weight: 600; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.welcome { text-align: center; margin-bottom: 12px; }
+.welcome .art { font-size: 2.6rem; margin: 6px 0 8px; }
+.welcome input { text-align: center; }
+.warn-hint { color: var(--warn); }
+body.host .me-chip { display: none; }

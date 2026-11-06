@@ -27,6 +27,7 @@ import { lookupCover, cachedCover, pendingLookups, downloadCover, flushCoverCach
 import { listSinks, setDefaultSink, enableHdmi } from './lib/system-audio.js';
 import { fairInsertIndex, countForSinger, singerKey } from './lib/fair-queue.js';
 import { currentVersion, checkUpdate, applyUpdate, rollback } from './lib/updater.js';
+import { analyzeSync } from './lib/autosync.js';
 import { logPlay, topSongs, topSingers, recentPlays, totalPlays, eveningStart } from './lib/stats.js';
 
 C.ensureDirs();
@@ -48,6 +49,7 @@ const DEFAULT_SETTINGS = {
   qrVisible: true, reactionsEnabled: true, overscan: 0, autoPlay: true,
   introSeconds: 5, maxVideoHeight: 720, preferInstrumental: false,
   fairQueue: true, maxPerSinger: 3, hostMode: false, voteSkipPercent: 50, wifiQrVisible: true,
+  autoSync: true, autoLatency: true, avLatencyMs: 0,
 };
 const settingsStore = new JsonStore(C.SETTINGS_FILE, DEFAULT_SETTINGS);
 const settings = settingsStore.data;
@@ -79,6 +81,9 @@ const SETTING_RULES = {
   hostMode: (v) => !!v,
   voteSkipPercent: (v) => clamp(Math.round(num(v, 50)), 25, 100),
   wifiQrVisible: (v) => !!v,
+  autoSync: (v) => !!v,
+  autoLatency: (v) => !!v,
+  avLatencyMs: (v) => clamp(Math.round(num(v) / 10) * 10, -300, 800),
 };
 
 // ───────────────────────────── Bibliotek ─────────────────────────────
@@ -92,6 +97,7 @@ function publicSong(s) {
     type: s.type, url: `/media/${s.file}`, cover: s.cover ? `/media/${s.cover}` : null,
     hasLyrics: !!s.lrc, lyricsSource: s.lyricsSource || null, lyricsQuality: s.lyricsQuality || null,
     offsetMs: s.offsetMs || 0, suggestedOffsetMs: s.suggestedOffsetMs || 0, gainDb: s.gainDb || 0,
+    sync: s.sync ? { scale: s.sync.scale, shiftSec: s.sync.shiftSec, confidence: s.sync.confidence, applied: !!s.sync.applied && !s.sync.disabled, disabled: !!s.sync.disabled } : null,
     tags: s.tags || [], source: s.source, cached: !!s.cached, addedAt: s.addedAt, plays: s.plays || 0,
   };
 }
@@ -158,7 +164,49 @@ async function analyzeSong(id) {
     const cur = getSong(id);
     if (cur) { cur.analyzed = true; library.save(); } // försök inte igen varje start
   }
+  syncSong(id);
 }
+
+// ── Automatisk synk (röstanalys). Hoppar över texter som redan är exakta (undertexter från samma video, manuell tap-synk).
+const syncQueue = [];
+let syncBusy = false;
+function needsSync(s) {
+  return s && s.lrc && !s.sync && !['youtube-subs', 'manual'].includes(s.lyricsSource) && !(s.type === 'video' && !s.lrc);
+}
+function syncSong(id, force = false) {
+  const s = getSong(id);
+  if (!settings.autoSync || !s || (!force && !needsSync(s))) return;
+  if (!syncQueue.includes(id)) syncQueue.push(id);
+  pumpSync();
+}
+async function pumpSync() {
+  if (syncBusy || !syncQueue.length) return;
+  syncBusy = true;
+  const id = syncQueue.shift();
+  try {
+    const s = getSong(id);
+    if (s?.lrc) {
+      const r = await analyzeSync(path.join(C.MEDIA_DIR, s.file), s.lrc);
+      const cur = getSong(id);
+      if (cur && cur.lrc === s.lrc) {
+        cur.sync = { ...r, disabled: false };
+        // Medelsäker träff utan tempoändring → visas som förslag i stället för att tillämpas
+        if (!r.applied && r.confidence === 'medium' && !r.nearIdentity && Math.abs(r.scale - 1) < 0.003 && !cur.offsetMs) {
+          cur.suggestedOffsetMs = -Math.round(r.shiftSec * 1000 / 50) * 50;
+        }
+        if (r.applied) cur.suggestedOffsetMs = 0;
+        library.save();
+        console.log(r.shiftSec == null ? `[synk] ${cur.title}: ingen analys (${r.reason || r.confidence})` : `[synk] ${cur.title}: ${r.confidence} · förskjutning ${r.shiftSec}s · tempo ${r.scale} · träff ${Math.round((r.hitRate || 0) * 100)}%${r.applied ? ' → tillämpad' : ''}`);
+        if (player.now?.songId === id) { io.to('tv').emit('tv:sync', { sync: publicSong(cur).sync }); broadcastState(); }
+      }
+    }
+  } catch (e) { console.warn('[synk]', e.message); const cur = getSong(id); if (cur) { cur.sync = { confidence: 'low', applied: false, error: e.message }; library.save(); } }
+  finally { syncBusy = false; pumpSync(); }
+}
+const syncStats = () => {
+  const all = Object.values(songs()).filter((s) => s.lrc);
+  return { withLyrics: all.length, analyzed: all.filter((s) => s.sync).length, applied: all.filter((s) => s.sync?.applied && !s.sync.disabled).length, pending: syncQueue.length + (syncBusy ? 1 : 0) };
+};
 
 // Riktigt albumomslag från iTunes istället för YouTube-miniatyr
 async function improveCover(id) {
@@ -421,6 +469,7 @@ function maybeLogPlay(completed = false) {
 
 function startNext() {
   maybeLogPlay();
+  player.vocalMono = false;
   clearTimeout(player.celebrateTimer);
   player.applause = 0;
   player.votes.clear();
@@ -597,7 +646,10 @@ app.patch('/api/songs/:id', requireAdmin, (req, res) => {
   if (b.offsetMs !== undefined) { s.offsetMs = clamp(Math.round(num(b.offsetMs)), -5000, 5000); s.suggestedOffsetMs = 0; }
   library.save();
   io.emit('library:changed');
+  if (typeof b.lrc === 'string') { delete s.sync; syncSong(s.id); } // ny text → ny analys
+  if (typeof b.syncDisabled === 'boolean' && s.sync) s.sync.disabled = b.syncDisabled;
   if (player.now?.songId === s.id && typeof b.lrc === 'string') io.to('tv').emit('tv:lyrics', { lrc: s.lrc || '' });
+  if (player.now?.songId === s.id && typeof b.syncDisabled === 'boolean') io.to('tv').emit('tv:sync', { sync: publicSong(s).sync });
   broadcastState();
   res.json({ ...publicSong(s), lrc: s.lrc || '' });
 });
@@ -620,6 +672,8 @@ app.post('/api/songs/:id/apply-lrclib', requireAdmin, async (req, res) => {
   const rec = await lrclibById(req.body?.lrclibId);
   if (!rec?.syncedLyrics) return res.status(404).json({ error: 'Ingen synkad text för valt id' });
   Object.assign(s, { lrc: rec.syncedLyrics, lyricsSource: 'lrclib', lyricsQuality: 'synced', lrclibId: rec.id, lrclibDuration: num(rec.duration) });
+  delete s.sync;
+  syncSong(s.id);
   library.save();
   if (player.now?.songId === s.id) io.to('tv').emit('tv:lyrics', { lrc: s.lrc });
   io.emit('library:changed');
@@ -765,7 +819,7 @@ app.get('/api/system', requireAdmin, async (req, res) => {
     songCount: Object.keys(songs()).length, ytdlp: await ytdlpVersion(), app: currentVersion(), updateRepo: C.UPDATE_REPO || null, node: process.version, cookies: hasCookies(),
     analysisPending: analysisQueueLength(), uptimeSec: Math.round((Date.now() - STARTED_AT) / 1000), load: os.loadavg(),
     memFree: os.freemem(), memTotal: os.totalmem(), hostname: os.hostname(), remoteUrl: remoteUrl(), systemd: !!process.env.INVOCATION_ID,
-    tvConnected: tvSockets.size > 0, remotes: activeRemoteCount(),
+    tvConnected: tvSockets.size > 0, remotes: activeRemoteCount(), sync: syncStats(),
   });
 });
 app.post('/api/system/clear-cache', requireAdmin, async (req, res) => res.json(await pruneCache({ all: true })));
@@ -848,7 +902,7 @@ function snapshot() {
     phase: player.phase, playback: player.playback, liveOffsetMs: player.liveOffsetMs, settings,
     jobs: [...jobs.values()].map(publicJob), remoteUrl: remoteUrl(), tvConnected: tvSockets.size > 0, pinRequired: !!C.ADMIN_PIN,
     wifi: C.WIFI_SSID ? { ssid: C.WIFI_SSID, password: C.WIFI_SHOW_PASSWORD ? C.WIFI_PASSWORD : null } : null,
-    history: player.history.slice(0, 6), votes: { count: player.votes.size, needed: voteThreshold() }, introSeconds: settings.introSeconds,
+    history: player.history.slice(0, 6), vocalMono: !!player.vocalMono, votes: { count: player.votes.size, needed: voteThreshold() }, introSeconds: settings.introSeconds,
   };
 }
 
@@ -979,6 +1033,7 @@ io.on('connection', (socket) => {
     settingsStore.save();
     io.emit('settings', settings);
     if ('hostMode' in applied || 'fairQueue' in applied || 'voteSkipPercent' in applied) broadcastState();
+    if (applied.autoSync) for (const s of Object.values(songs())) syncSong(s.id); // slogs på → analysera det som saknas
     ack(cb, { ok: true, applied });
   });
 
@@ -1027,13 +1082,28 @@ io.on('connection', (socket) => {
   });
 
   // ── Från TV:n ──
+  socket.on('tv:vocalMono', ({ mono } = {}) => {
+    if (socket.data.role !== 'tv' || player.vocalMono === !!mono) return;
+    player.vocalMono = !!mono;
+    broadcastState();
+  });
+
   socket.on('tv:beat', () => { if (socket.data.role === 'tv') lastTvBeat = Date.now(); });
 
-  socket.on('tv:state', ({ phase, t, d, paused } = {}) => {
+  // ── Kalibrering av ljudfördröjning (värd) ──
+  socket.on('calib:set', ({ on } = {}, cb) => {
+    if (needAdmin(cb)) return;
+    io.to('tv').emit('tv:calib', { on: !!on });
+    clearTimeout(player.calibTimer);
+    if (on) player.calibTimer = setTimeout(() => io.to('tv').emit('tv:calib', { on: false }), 3 * 60 * 1000);
+    ack(cb, { ok: true });
+  });
+
+  socket.on('tv:state', ({ phase, t, d, paused, lat } = {}) => {
     if (socket.data.role !== 'tv') return;
     lastTvBeat = Date.now();
     if (!player.now) return;
-    player.playback = { t: num(t), d: num(d), paused: !!paused };
+    player.playback = { t: num(t), d: num(d), paused: !!paused, lat: num(lat) };
     if (['intro', 'playing', 'paused'].includes(phase) && player.phase !== 'celebrate') player.phase = phase;
     socket.broadcast.volatile.emit('playback', { ...player.playback, phase: player.phase });
   });
@@ -1084,6 +1154,6 @@ restoreQueue();
 server.listen(C.PORT, '0.0.0.0', () => {
   console.log(`🎤 LAN Karaoke igång\n   TV:     http://localhost:${C.PORT}/tv\n   Mobil:  ${remoteUrl()}\n   Media:  ${C.MEDIA_DIR}\n   PIN:    ${C.ADMIN_PIN ? 'aktiv' : 'av'}`);
   // Analysera låtar som saknar loudness-data (uppgradering från v1) – i bakgrunden, en åt gången
-  for (const s of Object.values(songs())) if (!s.analyzed) analyzeSong(s.id);
+  for (const s of Object.values(songs())) { if (!s.analyzed) analyzeSong(s.id); else syncSong(s.id); }
   setTimeout(maybeAutoStart, 3000);
 });

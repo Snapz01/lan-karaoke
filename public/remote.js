@@ -415,6 +415,7 @@
     $('vocalLabel').textContent = `${Math.round((s.vocalReduce || 0) * 100)}%`;
     $('overscanLabel').textContent = `${String(s.overscan || 0).replace('.', ',')}%`;
     $('introLabel').textContent = s.introSeconds ? `${s.introSeconds} s` : 'Av';
+    $('monoHint').classList.toggle('hidden', !(S.vocalMono && (s.vocalReduce || 0) > 0));
     $('maxPerLabel').textContent = s.maxPerSinger ? String(s.maxPerSinger) : 'Obegränsat';
     $('voteLabel').textContent = `${s.voteSkipPercent || 50}% av mobilerna`;
     $('hostWarn').classList.toggle('hidden', !(s.hostMode && !S.pinRequired));
@@ -528,7 +529,6 @@
   }));
   // ── 🎲 Slumpa låt: viktat mot populära låtar, aldrig en som redan står i kön.
   // Valt snabbval (🇸🇪/🇬🇧/🕺/🎸) styr kategorin. Tomt bibliotek → slumpa ur förslagslistorna och sök.
-  let popularity = null;
   // Bortvalda låtar per telefon (localStorage) – visas inte igen inom 1 timme
   const REJECT_KEY = 'karaoke.rejected';
   const REJECT_MS = 60 * 60 * 1000;
@@ -544,32 +544,30 @@
     m[id] = Date.now();
     localStorage.setItem(REJECT_KEY, JSON.stringify(m));
   }
-  async function pickRandom() {
+  async function pickRandom(avoidId = null) {
     if (!libraryLoaded) await loadLibrary();
-    if (!popularity) {
-      popularity = new Map();
-      try { (await api('/api/stats?range=all')).items.forEach((e) => popularity.set(e.songId, e.count)); } catch { /* utan statistik: jämn vikt */ }
-    }
     const cat = document.querySelector('#searchPills button.on')?.dataset.cat || '';
     const busy = new Set([S.now?.id, ...(S.queue || []).map((e) => e.songId)].filter(Boolean));
-    let pool = library.filter((s) => !busy.has(s.id) && (s.hasLyrics || s.type === 'video'));
+    // Kvällens redan sjungna låtar (titel+artist från historiken) slumpas inte fram igen
+    const sung = new Set((S.history || []).map((x) => `${fold(x.artist)}|${fold(x.title)}`));
+    let pool = library.filter((s) => !busy.has(s.id) && (s.hasLyrics || s.type === 'video') && !sung.has(`${fold(s.artist)}|${fold(s.title)}`));
     if (cat) pool = pool.filter((s) => (s.tags || []).includes(cat));
     if (!pool.length) return null;
-    const rejected = getRejected();
-    const fresh = pool.filter((s) => !rejected[s.id]);
+    const seen = getRejected();
+    let fresh = pool.filter((s) => !seen[s.id]);
     if (!fresh.length) {
-      toast('🎲 Du har slumpat bort alla låtar – börjar om från början');
+      toast('🎲 Du har sett alla låtar – blandar om från början');
       localStorage.removeItem(REJECT_KEY);
-    } else pool = fresh;
-    const w = pool.map((s) => 1 + Math.min(5, popularity.get(s.id) || 0)); // populära låtar 2–6× vanligare
-    let r = Math.random() * w.reduce((a, b) => a + b, 0);
-    for (let i = 0; i < pool.length; i++) { r -= w[i]; if (r <= 0) return pool[i]; }
-    return pool[pool.length - 1];
+      fresh = pool.length > 1 ? pool.filter((s) => s.id !== avoidId) : pool; // aldrig samma två gånger i rad
+    }
+    // Äkta slump: alla låtar lika troliga (crypto om det finns)
+    const rnd = () => (window.crypto?.getRandomValues ? window.crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 : Math.random());
+    return fresh[Math.floor(rnd() * fresh.length)];
   }
   async function surprise(prevId = null) {
     vibrate(20);
-    if (prevId) rejectSong(prevId); // "Slumpa igen" = bortvald i 1 timme på den här telefonen
-    const s = await pickRandom();
+    const s = await pickRandom(prevId);
+    if (s) rejectSong(s.id); // allt som visas spärras i 1 timme på den här telefonen – samma låt kommer inte tillbaka
     if (!s) {
       const cat = document.querySelector('#searchPills button.on')?.dataset.cat;
       const list = SUGGEST[cat] || Object.values(SUGGEST).flat();
@@ -1182,6 +1180,37 @@
     if (HOST) setTimeout(hostGate, 400); // vänta in ev. PIN-svar
   });
   socket.on('update:stage', ({ stage }) => { if (HOST) $('updInfo').textContent = `⏳ ${stage}`; });
+
+  // ───────────────────────────── Namn ─────────────────────────────
+  // Frågas direkt när mobilen ansluter, så att namnet syns stort på TV:n när det blir ens tur.
+  const myName = () => (localStorage.getItem(SINGER_KEY) || '').trim();
+  function renderMe() {
+    $('meName').textContent = myName() || 'Ange namn';
+    const f = $('uploadForm');
+    if (f?.singer && !f.singer.value) f.singer.value = myName();
+  }
+  function askName(first = false) {
+    const input = h('input', { type: 'text', placeholder: 'Ditt namn', maxlength: '40', value: myName(), autocomplete: 'given-name', enterkeyhint: 'done' });
+    const save = () => {
+      const v = input.value.trim();
+      if (!v) { input.focus(); return; }
+      localStorage.setItem(SINGER_KEY, v);
+      renderMe();
+      closeSheet();
+      lastQueueSig = ''; renderQueue(); renderMyTurn();
+      toast(`👋 Hej ${v}! Ditt namn visas stort på TV:n när det är din tur.`, 'ok');
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+    openSheet(
+      h('div', { class: 'welcome' }, h('div', { class: 'art' }, first ? '🎤✨' : '🎤'),
+        h('h2', {}, first ? 'Välkommen till karaoke!' : 'Byt namn'),
+        h('div', { class: 'sub' }, 'Vad heter du? Namnet visas på TV:n när det börjar bli din tur.')),
+      h('div', { class: 'stack' }, input, h('button', { class: 'primary wide', onclick: save }, first ? 'Nu kör vi! 🎶' : 'Spara')));
+    setTimeout(() => input.focus(), 300);
+  }
+  $('meChip').addEventListener('click', () => askName(false));
+  renderMe();
+  if (!HOST && !myName()) setTimeout(() => askName(true), 600);
 
   // ───────────────────────────── Värdpanel ─────────────────────────────
   let hostReady = false;

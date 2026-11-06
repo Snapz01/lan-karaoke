@@ -33,38 +33,19 @@ const engine = {
     n.input = ctx.createGain();
     n.norm.connect(n.input);
 
-    // Sångdämpare: side (L−R) tar bort centrerad sång; lågpassad mid behåller bas/kick.
-    n.split = ctx.createChannelSplitter(2);
-    n.input.connect(n.split);
-    n.sideL = ctx.createGain();
-    n.sideR = ctx.createGain();
-    n.sideR.gain.value = -1;
-    n.split.connect(n.sideL, 0);
-    n.split.connect(n.sideR, 1);
-    n.side = ctx.createGain();
-    n.side.channelCount = 1;
-    n.side.channelCountMode = 'explicit';
-    n.side.gain.value = 0.8;
-    n.sideL.connect(n.side);
-    n.sideR.connect(n.side);
-    n.bass = ctx.createBiquadFilter();
-    n.bass.type = 'lowpass';
-    n.bass.frequency.value = 160;
-    n.bass.Q.value = 0.7;
-    n.input.connect(n.bass);
-    n.wet = ctx.createGain();
-    n.wet.gain.value = 0;
-    n.side.connect(n.wet);
-    n.bass.connect(n.wet);
-    n.dry = ctx.createGain();
-    n.input.connect(n.dry);
-    n.mix = ctx.createGain();
-    n.wet.connect(n.mix);
-    n.dry.connect(n.mix);
-
-    // Mono-steg: channelCount=1 + explicit nedmixar L/R.
+    // Sångdämpning 2.0 (spektral, se vocal-worklet.js). Saknas AudioWorklet → ingen dämpning.
     n.mono = ctx.createGain();
-    n.mix.connect(n.mono);
+    this.vocal = null;
+    try {
+      await ctx.audioWorklet.addModule('/vocal-worklet.js');
+      this.vocal = new AudioWorkletNode(ctx, 'vocal-reducer', { outputChannelCount: [2] });
+      this.vocal.port.onmessage = (e) => { if ('mono' in e.data) { this.vocalMono = e.data.mono; socket.emit('tv:vocalMono', { mono: e.data.mono }); } };
+      n.input.connect(this.vocal);
+      this.vocal.connect(n.mono);
+    } catch (e) {
+      console.warn('Sångdämpning ej tillgänglig:', e);
+      n.input.connect(n.mono);
+    }
     let last = n.mono;
 
     try {
@@ -97,9 +78,7 @@ const engine = {
     const n = this.nodes;
     const vol = s.muted ? 0 : Math.pow(s.volume ?? 0.85, 2);
     n.master.gain.setTargetAtTime(vol, t, 0.05);
-    const k = s.vocalReduce ?? 0;
-    n.wet.gain.setTargetAtTime(k, t, 0.05);
-    n.dry.gain.setTargetAtTime(1 - k, t, 0.05);
+    if (this.vocal) this.vocal.parameters.get('amount').setTargetAtTime(s.vocalReduce ?? 0, t, 0.05);
     n.mono.channelCount = s.mono ? 1 : 2;
     n.mono.channelCountMode = s.mono ? 'explicit' : 'max';
     n.low.gain.setTargetAtTime(s.eqLow || 0, t, 0.05);
@@ -114,7 +93,8 @@ const engine = {
     const c = this.ctx;
     if (!c) return 0;
     const pitchDelay = this.pitch && (settings.pitch || 0) !== 0 ? (2 + 0.035 * c.sampleRate) / c.sampleRate : 0;
-    return (c.baseLatency || 0) + (c.outputLatency || 0) + pitchDelay;
+    const vocalDelay = this.vocal ? 2048 / c.sampleRate : 0; // STFT-fönstret (alltid i kedjan → konstant)
+    return (c.baseLatency || 0) + (c.outputLatency || 0) + pitchDelay + vocalDelay;
   },
 
   songGainDb: 0,
@@ -660,7 +640,9 @@ function onEnded() {
 
 // ───────────────────────────── Firande & reaktioner ─────────────────────────────
 let celebrateTimer = null;
+function hideReady() { readyShown = false; $('readyBanner').classList.add('hidden'); document.body.classList.remove('ready-on'); }
 function clearCelebration() {
+  hideReady();
   clearTimeout(celebrateTimer);
   celebrating = false;
   document.body.classList.remove('celebrating');
@@ -670,6 +652,7 @@ function clearCelebration() {
 
 function celebrate(singer) {
   celebrating = true;
+  hideReady();
   document.body.classList.add('celebrating');
   const el = $('celebrate');
   el.textContent = '';
@@ -757,6 +740,7 @@ function lyricTime(ct) {
 }
 
 let lastTimeText = '';
+let readyShown = false;
 function frame() {
   if (calib.on) drawCalib();
   requestAnimationFrame(frame);
@@ -778,6 +762,18 @@ function frame() {
       if (txt !== lastTimeText) { lastTimeText = txt; $('nowTime').textContent = txt; }
     }
     $('nextChip').classList.toggle('soon', remaining < 20 && !$('nextChip').classList.contains('hidden'));
+    // Stor namnskylt de sista 20 sekunderna så att nästa sångare hinner fram
+    const next = snapshot?.queue?.[0];
+    const showReady = !!next && remaining < 20 && remaining > 0.5 && !celebrating;
+    if (showReady !== readyShown) {
+      readyShown = showReady;
+      $('readyBanner').classList.toggle('hidden', !showReady);
+      document.body.classList.toggle('ready-on', showReady);
+      if (showReady) {
+        $('readyName').textContent = next.singer || 'Nästa sångare';
+        $('readySong').textContent = `${next.title}${next.artist ? ` – ${next.artist}` : ''}`;
+      }
+    }
   }
   drawViz();
 }

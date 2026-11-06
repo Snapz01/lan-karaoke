@@ -231,3 +231,14 @@ body.video-full #nowCard { opacity: .0; }
 .calib-help { font-size: 1.6vw; color: rgba(255, 255, 255, .8); }
 .calib-help b { color: var(--accent); }
 .calib-val { margin-top: 2vh; font-size: 2.4vw; font-weight: 700; color: var(--accent2); font-variant-numeric: tabular-nums; }
+
+/* ── "Gör dig redo"-skylt ── */
+#readyBanner { position: absolute; left: 50%; top: 2.5%; transform: translateX(-50%); z-index: 7; min-width: 30vw; max-width: 46vw; padding: 1vw 2.6vw; text-align: center;
+  border-radius: 2vw; background: linear-gradient(135deg, rgba(0, 0, 0, .78), rgba(40, 10, 70, .85)); border: .2vw solid var(--accent);
+  box-shadow: 0 0 4vw var(--glow); animation: readyIn .6s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes readyIn { from { transform: translate(-50%, -6vh) scale(.8); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+.rb-lbl { font-size: 1.3vw; letter-spacing: .4em; color: var(--accent2); font-weight: 700; }
+.rb-name { font-size: 4.2vw; font-weight: 700; line-height: 1.1; background: linear-gradient(90deg, var(--fill2), var(--accent), var(--accent2));
+  -webkit-background-clip: text; background-clip: text; color: transparent; overflow-wrap: anywhere; animation: pulse 1.2s ease-in-out infinite; }
+.rb-song { font-size: 1.5vw; color: rgba(255, 255, 255, .8); margin-top: .3vw; }
+body.ready-on #nextChip { opacity: 0; }
